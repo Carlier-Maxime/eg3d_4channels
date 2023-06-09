@@ -1,3 +1,7 @@
+# EG3D with 4 channels support
+
+version of eg3d allowing the use of 4 channels (RGBA) . This is not an official version of eg3d
+
 ## Efficient Geometry-aware 3D Generative Adversarial Networks (EG3D)<br><sub>Official PyTorch implementation of the CVPR 2022 paper</sub>
 
 ![Teaser image](./docs/teaser.jpeg)
