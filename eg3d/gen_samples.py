@@ -179,7 +179,7 @@ def generate_images(
 
         img = torch.cat(imgs, dim=2)
 
-        PIL.Image.fromarray(img[0].cpu().numpy(), 'RGB').save(f'{outdir}/seed{seed:04d}.png')
+        PIL.Image.fromarray(img[0].cpu().numpy(), 'RGBA' if img.shape[-1] == 4 else 'RGB').save(f'{outdir}/seed{seed:04d}.png')
 
         if shapes:
             # extract a shape.mrc with marching cubes. You can view the .mrc file using ChimeraX from UCSF.

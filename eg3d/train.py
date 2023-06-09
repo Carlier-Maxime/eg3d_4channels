@@ -329,6 +329,16 @@ def main(**kwargs):
             'avg_camera_radius': 1.7,
             'avg_camera_pivot': [0, 0, 0],
         })
+    elif opts.cfg == 'flame':
+        rendering_options.update({
+            'depth_resolution': 64,
+            'depth_resolution_importance': 64,
+            'ray_start': 0.1,
+            'ray_end': 100,
+            'box_warp': 2,
+            'avg_camera_radius': 4.,
+            'avg_camera_pivot': [0, 0, 0],
+        })
     else:
         assert False, "Need to specify config"
 

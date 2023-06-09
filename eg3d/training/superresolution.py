@@ -22,14 +22,14 @@ import numpy as np
 from training.networks_stylegan3 import SynthesisLayer as AFSynthesisLayer
 
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 
 # for 512x512 generation
 @persistence.persistent_class
 class SuperresolutionHybrid8X(torch.nn.Module):
     def __init__(self, channels, img_resolution, sr_num_fp16_res, sr_antialias,
-                num_fp16_res=4, conv_clamp=None, channel_base=None, channel_max=None,# IGNORE
-                **block_kwargs):
+                 num_fp16_res=4, conv_clamp=None, channel_base=None, channel_max=None,  # IGNORE
+                 **block_kwargs):
         super().__init__()
         assert img_resolution == 512
 
@@ -37,17 +37,17 @@ class SuperresolutionHybrid8X(torch.nn.Module):
         self.input_resolution = 128
         self.sr_antialias = sr_antialias
         self.block0 = SynthesisBlock(channels, 128, w_dim=512, resolution=256,
-                img_channels=3, is_last=False, use_fp16=use_fp16, conv_clamp=(256 if use_fp16 else None), **block_kwargs)
+                                     img_channels=3, is_last=False, use_fp16=use_fp16, conv_clamp=(256 if use_fp16 else None), **block_kwargs)
         self.block1 = SynthesisBlock(128, 64, w_dim=512, resolution=512,
-                img_channels=3, is_last=True, use_fp16=use_fp16, conv_clamp=(256 if use_fp16 else None), **block_kwargs)
-        self.register_buffer('resample_filter', upfirdn2d.setup_filter([1,3,3,1]))
+                                     img_channels=3, is_last=True, use_fp16=use_fp16, conv_clamp=(256 if use_fp16 else None), **block_kwargs)
+        self.register_buffer('resample_filter', upfirdn2d.setup_filter([1, 3, 3, 1]))
 
     def forward(self, rgb, x, ws, **block_kwargs):
         ws = ws[:, -1:, :].repeat(1, 3, 1)
 
         if x.shape[-1] != self.input_resolution:
             x = torch.nn.functional.interpolate(x, size=(self.input_resolution, self.input_resolution),
-                                                  mode='bilinear', align_corners=False, antialias=self.sr_antialias)
+                                                mode='bilinear', align_corners=False, antialias=self.sr_antialias)
             rgb = torch.nn.functional.interpolate(rgb, size=(self.input_resolution, self.input_resolution),
                                                   mode='bilinear', align_corners=False, antialias=self.sr_antialias)
 
@@ -55,31 +55,32 @@ class SuperresolutionHybrid8X(torch.nn.Module):
         x, rgb = self.block1(x, rgb, ws, **block_kwargs)
         return rgb
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 # for 256x256 generation
 @persistence.persistent_class
 class SuperresolutionHybrid4X(torch.nn.Module):
     def __init__(self, channels, img_resolution, sr_num_fp16_res, sr_antialias,
-                num_fp16_res=4, conv_clamp=None, channel_base=None, channel_max=None,# IGNORE
-                **block_kwargs):
+                 num_fp16_res=4, conv_clamp=None, channel_base=None, channel_max=None,  # IGNORE
+                 **block_kwargs):
         super().__init__()
         assert img_resolution == 256
         use_fp16 = sr_num_fp16_res > 0
         self.sr_antialias = sr_antialias
         self.input_resolution = 128
         self.block0 = SynthesisBlockNoUp(channels, 128, w_dim=512, resolution=128,
-                img_channels=3, is_last=False, use_fp16=use_fp16, conv_clamp=(256 if use_fp16 else None), **block_kwargs)
+                                         img_channels=3, is_last=False, use_fp16=use_fp16, conv_clamp=(256 if use_fp16 else None), **block_kwargs)
         self.block1 = SynthesisBlock(128, 64, w_dim=512, resolution=256,
-                img_channels=3, is_last=True, use_fp16=use_fp16, conv_clamp=(256 if use_fp16 else None), **block_kwargs)
-        self.register_buffer('resample_filter', upfirdn2d.setup_filter([1,3,3,1]))
+                                     img_channels=3, is_last=True, use_fp16=use_fp16, conv_clamp=(256 if use_fp16 else None), **block_kwargs)
+        self.register_buffer('resample_filter', upfirdn2d.setup_filter([1, 3, 3, 1]))
 
     def forward(self, rgb, x, ws, **block_kwargs):
         ws = ws[:, -1:, :].repeat(1, 3, 1)
 
         if x.shape[-1] < self.input_resolution:
             x = torch.nn.functional.interpolate(x, size=(self.input_resolution, self.input_resolution),
-                                                  mode='bilinear', align_corners=False, antialias=self.sr_antialias)
+                                                mode='bilinear', align_corners=False, antialias=self.sr_antialias)
             rgb = torch.nn.functional.interpolate(rgb, size=(self.input_resolution, self.input_resolution),
                                                   mode='bilinear', align_corners=False, antialias=self.sr_antialias)
 
@@ -87,14 +88,15 @@ class SuperresolutionHybrid4X(torch.nn.Module):
         x, rgb = self.block1(x, rgb, ws, **block_kwargs)
         return rgb
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 # for 128 x 128 generation
 @persistence.persistent_class
 class SuperresolutionHybrid2X(torch.nn.Module):
     def __init__(self, channels, img_resolution, sr_num_fp16_res, sr_antialias,
-                num_fp16_res=4, conv_clamp=None, channel_base=None, channel_max=None,# IGNORE
-                **block_kwargs):
+                 num_fp16_res=4, conv_clamp=None, channel_base=None, channel_max=None,  # IGNORE
+                 **block_kwargs):
         super().__init__()
         assert img_resolution == 128
 
@@ -102,17 +104,17 @@ class SuperresolutionHybrid2X(torch.nn.Module):
         self.input_resolution = 64
         self.sr_antialias = sr_antialias
         self.block0 = SynthesisBlockNoUp(channels, 128, w_dim=512, resolution=64,
-                img_channels=3, is_last=False, use_fp16=use_fp16, conv_clamp=(256 if use_fp16 else None), **block_kwargs)
+                                         img_channels=4, is_last=False, use_fp16=use_fp16, conv_clamp=(256 if use_fp16 else None), **block_kwargs)
         self.block1 = SynthesisBlock(128, 64, w_dim=512, resolution=128,
-                img_channels=3, is_last=True, use_fp16=use_fp16, conv_clamp=(256 if use_fp16 else None), **block_kwargs)
-        self.register_buffer('resample_filter', upfirdn2d.setup_filter([1,3,3,1]))
+                                     img_channels=4, is_last=True, use_fp16=use_fp16, conv_clamp=(256 if use_fp16 else None), **block_kwargs)
+        self.register_buffer('resample_filter', upfirdn2d.setup_filter([1, 3, 3, 1]))
 
     def forward(self, rgb, x, ws, **block_kwargs):
         ws = ws[:, -1:, :].repeat(1, 3, 1)
 
         if x.shape[-1] != self.input_resolution:
             x = torch.nn.functional.interpolate(x, size=(self.input_resolution, self.input_resolution),
-                                                  mode='bilinear', align_corners=False, antialias=self.sr_antialias)
+                                                mode='bilinear', align_corners=False, antialias=self.sr_antialias)
             rgb = torch.nn.functional.interpolate(rgb, size=(self.input_resolution, self.input_resolution),
                                                   mode='bilinear', align_corners=False, antialias=self.sr_antialias)
 
@@ -120,31 +122,32 @@ class SuperresolutionHybrid2X(torch.nn.Module):
         x, rgb = self.block1(x, rgb, ws, **block_kwargs)
         return rgb
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 # TODO: Delete (here for backwards compatibility with old 256x256 models)
 @persistence.persistent_class
 class SuperresolutionHybridDeepfp32(torch.nn.Module):
     def __init__(self, channels, img_resolution, sr_num_fp16_res,
-                num_fp16_res=4, conv_clamp=None, channel_base=None, channel_max=None,# IGNORE
-                **block_kwargs):
+                 num_fp16_res=4, conv_clamp=None, channel_base=None, channel_max=None,  # IGNORE
+                 **block_kwargs):
         super().__init__()
         assert img_resolution == 256
         use_fp16 = sr_num_fp16_res > 0
 
         self.input_resolution = 128
         self.block0 = SynthesisBlockNoUp(channels, 128, w_dim=512, resolution=128,
-                img_channels=3, is_last=False, use_fp16=use_fp16, conv_clamp=(256 if use_fp16 else None), **block_kwargs)
+                                         img_channels=3, is_last=False, use_fp16=use_fp16, conv_clamp=(256 if use_fp16 else None), **block_kwargs)
         self.block1 = SynthesisBlock(128, 64, w_dim=512, resolution=256,
-                img_channels=3, is_last=True, use_fp16=use_fp16, conv_clamp=(256 if use_fp16 else None), **block_kwargs)
-        self.register_buffer('resample_filter', upfirdn2d.setup_filter([1,3,3,1]))
+                                     img_channels=3, is_last=True, use_fp16=use_fp16, conv_clamp=(256 if use_fp16 else None), **block_kwargs)
+        self.register_buffer('resample_filter', upfirdn2d.setup_filter([1, 3, 3, 1]))
 
     def forward(self, rgb, x, ws, **block_kwargs):
         ws = ws[:, -1:, :].repeat(1, 3, 1)
 
         if x.shape[-1] < self.input_resolution:
             x = torch.nn.functional.interpolate(x, size=(self.input_resolution, self.input_resolution),
-                                                  mode='bilinear', align_corners=False)
+                                                mode='bilinear', align_corners=False)
             rgb = torch.nn.functional.interpolate(rgb, size=(self.input_resolution, self.input_resolution),
                                                   mode='bilinear', align_corners=False)
 
@@ -152,25 +155,26 @@ class SuperresolutionHybridDeepfp32(torch.nn.Module):
         x, rgb = self.block1(x, rgb, ws, **block_kwargs)
         return rgb
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 @persistence.persistent_class
 class SynthesisBlockNoUp(torch.nn.Module):
     def __init__(self,
-        in_channels,                            # Number of input channels, 0 = first block.
-        out_channels,                           # Number of output channels.
-        w_dim,                                  # Intermediate latent (W) dimensionality.
-        resolution,                             # Resolution of this block.
-        img_channels,                           # Number of output color channels.
-        is_last,                                # Is this the last block?
-        architecture            = 'skip',       # Architecture: 'orig', 'skip', 'resnet'.
-        resample_filter         = [1,3,3,1],    # Low-pass filter to apply when resampling activations.
-        conv_clamp              = 256,          # Clamp the output of convolution layers to +-X, None = disable clamping.
-        use_fp16                = False,        # Use FP16 for this block?
-        fp16_channels_last      = False,        # Use channels-last memory format with FP16?
-        fused_modconv_default   = True,         # Default value of fused_modconv. 'inference_only' = True for inference, False for training.
-        **layer_kwargs,                         # Arguments for SynthesisLayer.
-    ):
+                 in_channels,  # Number of input channels, 0 = first block.
+                 out_channels,  # Number of output channels.
+                 w_dim,  # Intermediate latent (W) dimensionality.
+                 resolution,  # Resolution of this block.
+                 img_channels,  # Number of output color channels.
+                 is_last,  # Is this the last block?
+                 architecture='skip',  # Architecture: 'orig', 'skip', 'resnet'.
+                 resample_filter=[1, 3, 3, 1],  # Low-pass filter to apply when resampling activations.
+                 conv_clamp=256,  # Clamp the output of convolution layers to +-X, None = disable clamping.
+                 use_fp16=False,  # Use FP16 for this block?
+                 fp16_channels_last=False,  # Use channels-last memory format with FP16?
+                 fused_modconv_default=True,  # Default value of fused_modconv. 'inference_only' = True for inference, False for training.
+                 **layer_kwargs,  # Arguments for SynthesisLayer.
+                 ):
         assert architecture in ['orig', 'skip', 'resnet']
         super().__init__()
         self.in_channels = in_channels
@@ -191,24 +195,24 @@ class SynthesisBlockNoUp(torch.nn.Module):
 
         if in_channels != 0:
             self.conv0 = SynthesisLayer(in_channels, out_channels, w_dim=w_dim, resolution=resolution,
-                conv_clamp=conv_clamp, channels_last=self.channels_last, **layer_kwargs)
+                                        conv_clamp=conv_clamp, channels_last=self.channels_last, **layer_kwargs)
             self.num_conv += 1
 
         self.conv1 = SynthesisLayer(out_channels, out_channels, w_dim=w_dim, resolution=resolution,
-            conv_clamp=conv_clamp, channels_last=self.channels_last, **layer_kwargs)
+                                    conv_clamp=conv_clamp, channels_last=self.channels_last, **layer_kwargs)
         self.num_conv += 1
 
         if is_last or architecture == 'skip':
             self.torgb = ToRGBLayer(out_channels, img_channels, w_dim=w_dim,
-                conv_clamp=conv_clamp, channels_last=self.channels_last)
+                                    conv_clamp=conv_clamp, channels_last=self.channels_last)
             self.num_torgb += 1
 
         if in_channels != 0 and architecture == 'resnet':
             self.skip = Conv2dLayer(in_channels, out_channels, kernel_size=1, bias=False, up=2,
-                resample_filter=resample_filter, channels_last=self.channels_last)
+                                    resample_filter=resample_filter, channels_last=self.channels_last)
 
     def forward(self, x, img, ws, force_fp32=False, fused_modconv=None, update_emas=False, **layer_kwargs):
-        _ = update_emas # unused
+        _ = update_emas  # unused
         misc.assert_shape(ws, [None, self.num_conv + self.num_torgb, self.w_dim])
         w_iter = iter(ws.unbind(dim=1))
         if ws.device.type != 'cuda':
@@ -242,8 +246,8 @@ class SynthesisBlockNoUp(torch.nn.Module):
 
         # ToRGB.
         # if img is not None:
-            # misc.assert_shape(img, [None, self.img_channels, self.resolution // 2, self.resolution // 2])
-            # img = upfirdn2d.upsample2d(img, self.resample_filter)
+        # misc.assert_shape(img, [None, self.img_channels, self.resolution // 2, self.resolution // 2])
+        # img = upfirdn2d.upsample2d(img, self.resample_filter)
         if self.is_last or self.architecture == 'skip':
             y = self.torgb(x, next(w_iter), fused_modconv=fused_modconv)
             y = y.to(dtype=torch.float32, memory_format=torch.contiguous_format)
@@ -257,14 +261,14 @@ class SynthesisBlockNoUp(torch.nn.Module):
         return f'resolution={self.resolution:d}, architecture={self.architecture:s}'
 
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 
 # for 512x512 generation
 @persistence.persistent_class
 class SuperresolutionHybrid8XDC(torch.nn.Module):
     def __init__(self, channels, img_resolution, sr_num_fp16_res, sr_antialias,
-                num_fp16_res=4, conv_clamp=None, channel_base=None, channel_max=None,# IGNORE
-                **block_kwargs):
+                 num_fp16_res=4, conv_clamp=None, channel_base=None, channel_max=None,  # IGNORE
+                 **block_kwargs):
         super().__init__()
         assert img_resolution == 512
 
@@ -272,16 +276,16 @@ class SuperresolutionHybrid8XDC(torch.nn.Module):
         self.input_resolution = 128
         self.sr_antialias = sr_antialias
         self.block0 = SynthesisBlock(channels, 256, w_dim=512, resolution=256,
-                img_channels=3, is_last=False, use_fp16=use_fp16, conv_clamp=(256 if use_fp16 else None), **block_kwargs)
+                                     img_channels=3, is_last=False, use_fp16=use_fp16, conv_clamp=(256 if use_fp16 else None), **block_kwargs)
         self.block1 = SynthesisBlock(256, 128, w_dim=512, resolution=512,
-                img_channels=3, is_last=True, use_fp16=use_fp16, conv_clamp=(256 if use_fp16 else None), **block_kwargs)
+                                     img_channels=3, is_last=True, use_fp16=use_fp16, conv_clamp=(256 if use_fp16 else None), **block_kwargs)
 
     def forward(self, rgb, x, ws, **block_kwargs):
         ws = ws[:, -1:, :].repeat(1, 3, 1)
 
         if x.shape[-1] != self.input_resolution:
             x = torch.nn.functional.interpolate(x, size=(self.input_resolution, self.input_resolution),
-                                                  mode='bilinear', align_corners=False, antialias=self.sr_antialias)
+                                                mode='bilinear', align_corners=False, antialias=self.sr_antialias)
             rgb = torch.nn.functional.interpolate(rgb, size=(self.input_resolution, self.input_resolution),
                                                   mode='bilinear', align_corners=False, antialias=self.sr_antialias)
 
@@ -289,4 +293,4 @@ class SuperresolutionHybrid8XDC(torch.nn.Module):
         x, rgb = self.block1(x, rgb, ws, **block_kwargs)
         return rgb
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------

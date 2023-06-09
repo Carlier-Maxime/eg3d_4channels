@@ -43,7 +43,6 @@ class RaySampler(torch.nn.Module):
         uv = torch.stack(torch.meshgrid(torch.arange(resolution, dtype=torch.float32, device=cam2world_matrix.device), torch.arange(resolution, dtype=torch.float32, device=cam2world_matrix.device), indexing='ij')) * (1./resolution) + (0.5/resolution)
         uv = uv.flip(0).reshape(2, -1).transpose(1, 0)
         uv = uv.unsqueeze(0).repeat(cam2world_matrix.shape[0], 1, 1)
-
         x_cam = uv[:, :, 0].view(N, -1)
         y_cam = uv[:, :, 1].view(N, -1)
         z_cam = torch.ones((N, M), device=cam2world_matrix.device)
