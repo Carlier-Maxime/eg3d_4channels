@@ -15,7 +15,6 @@ Checks in-the-wild images to verify images are complete and uncorrupted. Deletes
 failed check. After running this script, re-run download_ffhq.py to reacquire failed images.
 """
 
-
 import json
 from PIL import Image
 import hashlib
@@ -40,7 +39,7 @@ if __name__ == '__main__':
         try:
             if args.mode == 'file':
                 with open(file_spec['file_path'], 'rb') as file_to_check:
-                    data = file_to_check.read()    
+                    data = file_to_check.read()
                     if 'file_md5' in file_spec and hashlib.md5(data).hexdigest() != file_spec['file_md5']:
                         raise IOError('Incorrect file MD5', file_spec['file_path'])
             elif args.mode == 'pixel':

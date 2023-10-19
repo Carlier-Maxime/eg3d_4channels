@@ -26,7 +26,8 @@ from torch_utils import custom_ops
 from torch_utils import misc
 from torch_utils.ops import conv2d_gradfix
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def subprocess_fn(rank, args, temp_dir):
     dnnlib.util.Logger(should_flush=True)
@@ -66,7 +67,7 @@ def subprocess_fn(rank, args, temp_dir):
             print(f'Calculating {metric}...')
         progress = metric_utils.ProgressMonitor(verbose=args.verbose)
         result_dict = metric_main.calc_metric(metric=metric, G=G, dataset_kwargs=args.dataset_kwargs,
-            num_gpus=args.num_gpus, rank=rank, device=device, progress=progress)
+                                              num_gpus=args.num_gpus, rank=rank, device=device, progress=progress)
         if rank == 0:
             metric_main.report_metric(result_dict, run_dir=args.run_dir, snapshot_pkl=args.network_pkl)
         if rank == 0 and args.verbose:
@@ -76,7 +77,8 @@ def subprocess_fn(rank, args, temp_dir):
     if rank == 0 and args.verbose:
         print('Exiting...')
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def parse_comma_separated_list(s):
     if isinstance(s, list):
@@ -85,7 +87,8 @@ def parse_comma_separated_list(s):
         return []
     return s.split(',')
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 @click.command()
 @click.pass_context
@@ -95,7 +98,6 @@ def parse_comma_separated_list(s):
 @click.option('--mirror', help='Enable dataset x-flips  [default: look up]', type=bool, metavar='BOOL')
 @click.option('--gpus', help='Number of GPUs to use', type=int, default=1, metavar='INT', show_default=True)
 @click.option('--verbose', help='Print optional information', type=bool, default=True, metavar='BOOL', show_default=True)
-
 def calc_metrics(ctx, network_pkl, metrics, data, mirror, gpus, verbose):
     """Calculate quality metrics for previous training run or pretrained network pickle.
 
@@ -144,7 +146,7 @@ def calc_metrics(ctx, network_pkl, metrics, data, mirror, gpus, verbose):
         print(f'Loading network from "{network_pkl}"...')
     with dnnlib.util.open_url(network_pkl, verbose=args.verbose) as f:
         network_dict = legacy.load_network_pkl(f)
-        args.G = network_dict['G_ema'] # subclass of torch.nn.Module
+        args.G = network_dict['G_ema']  # subclass of torch.nn.Module
 
     # Initialize dataset options.
     if data is not None:
@@ -182,9 +184,10 @@ def calc_metrics(ctx, network_pkl, metrics, data, mirror, gpus, verbose):
         else:
             torch.multiprocessing.spawn(fn=subprocess_fn, args=(args, temp_dir), nprocs=args.num_gpus)
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    calc_metrics() # pylint: disable=no-value-for-parameter
+    calc_metrics()  # pylint: disable=no-value-for-parameter
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------

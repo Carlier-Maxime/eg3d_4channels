@@ -11,14 +11,15 @@
 import imgui
 from gui_utils import imgui_utils
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 class RenderTypeWidget:
     def __init__(self, viz):
-        self.viz        = viz
+        self.viz = viz
         self.render_type = 0
-        self.render_types = ['image',     'image_depth', 'image_raw']
-        self.labels       = ['RGB Image', 'Depth Image', 'Neural Rendered Image']
+        self.render_types = ['image', 'image_depth', 'image_raw']
+        self.labels = ['RGB Image', 'Depth Image', 'Neural Rendered Image']
 
     @imgui_utils.scoped_by_object_id
     def __call__(self, show=True):
@@ -32,4 +33,4 @@ class RenderTypeWidget:
 
         viz.args.render_type = self.render_types[self.render_type]
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------

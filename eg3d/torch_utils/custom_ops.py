@@ -20,12 +20,13 @@ import torch
 import torch.utils.cpp_extension
 from torch.utils.file_baton import FileBaton
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 # Global options.
 
-verbosity = 'brief' # Verbosity level: 'none', 'brief', 'full'
+verbosity = 'brief'  # Verbosity level: 'none', 'brief', 'full'
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 # Internal helper funcs.
 
 def _find_compiler_bindir():
@@ -41,7 +42,8 @@ def _find_compiler_bindir():
             return matches[-1]
     return None
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def _get_mangled_gpu_name():
     name = torch.cuda.get_device_name().lower()
@@ -53,10 +55,12 @@ def _get_mangled_gpu_name():
             out.append('-')
     return ''.join(out)
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 # Main entry point for compiling and loading C++/CUDA plugins.
 
 _cached_plugins = dict()
+
 
 def get_plugin(module_name, sources, headers=None, source_dir=None, **build_kwargs):
     assert verbosity in ['none', 'brief', 'full']
@@ -78,7 +82,7 @@ def get_plugin(module_name, sources, headers=None, source_dir=None, **build_kwar
     verbose_build = (verbosity == 'full')
 
     # Compile and load.
-    try: # pylint: disable=too-many-nested-blocks
+    try:  # pylint: disable=too-many-nested-blocks
         # Make sure we can find the necessary compiler binaries.
         if os.name == 'nt' and os.system("where cl.exe >nul 2>nul") != 0:
             compiler_bindir = _find_compiler_bindir()
@@ -108,7 +112,7 @@ def get_plugin(module_name, sources, headers=None, source_dir=None, **build_kwar
         #
         all_source_files = sorted(sources + headers)
         all_source_dirs = set(os.path.dirname(fname) for fname in all_source_files)
-        if len(all_source_dirs) == 1: # and ('TORCH_EXTENSIONS_DIR' in os.environ):
+        if len(all_source_dirs) == 1:  # and ('TORCH_EXTENSIONS_DIR' in os.environ):
 
             # Compute combined hash digest for all source files.
             hash_md5 = hashlib.md5()
@@ -118,7 +122,7 @@ def get_plugin(module_name, sources, headers=None, source_dir=None, **build_kwar
 
             # Select cached build directory name.
             source_digest = hash_md5.hexdigest()
-            build_top_dir = torch.utils.cpp_extension._get_build_directory(module_name, verbose=verbose_build) # pylint: disable=protected-access
+            build_top_dir = torch.utils.cpp_extension._get_build_directory(module_name, verbose=verbose_build)  # pylint: disable=protected-access
             cached_build_dir = os.path.join(build_top_dir, f'{source_digest}-{_get_mangled_gpu_name()}')
 
             if not os.path.isdir(cached_build_dir):
@@ -127,7 +131,7 @@ def get_plugin(module_name, sources, headers=None, source_dir=None, **build_kwar
                 for src in all_source_files:
                     shutil.copyfile(src, os.path.join(tmpdir, os.path.basename(src)))
                 try:
-                    os.replace(tmpdir, cached_build_dir) # atomic
+                    os.replace(tmpdir, cached_build_dir)  # atomic
                 except OSError:
                     # source directory already exists, delete tmpdir and its contents.
                     shutil.rmtree(tmpdir)
@@ -136,7 +140,7 @@ def get_plugin(module_name, sources, headers=None, source_dir=None, **build_kwar
             # Compile.
             cached_sources = [os.path.join(cached_build_dir, os.path.basename(fname)) for fname in sources]
             torch.utils.cpp_extension.load(name=module_name, build_directory=cached_build_dir,
-                verbose=verbose_build, sources=cached_sources, **build_kwargs)
+                                           verbose=verbose_build, sources=cached_sources, **build_kwargs)
         else:
             torch.utils.cpp_extension.load(name=module_name, verbose=verbose_build, sources=sources, **build_kwargs)
 
@@ -156,4 +160,4 @@ def get_plugin(module_name, sources, headers=None, source_dir=None, **build_kwar
     _cached_plugins[module_name] = module
     return module
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------

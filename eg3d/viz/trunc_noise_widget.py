@@ -11,17 +11,18 @@
 import imgui
 from gui_utils import imgui_utils
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 class TruncationNoiseWidget:
     def __init__(self, viz):
-        self.viz            = viz
-        self.prev_num_ws    = 0
-        self.trunc_psi      = 0.7
-        self.trunc_cutoff   = 7
-        self.noise_enable   = True
-        self.noise_seed     = 0
-        self.noise_anim     = False
+        self.viz = viz
+        self.prev_num_ws = 0
+        self.trunc_psi = 0.7
+        self.trunc_cutoff = 7
+        self.noise_enable = True
+        self.noise_seed = 0
+        self.noise_anim = False
 
     @imgui_utils.scoped_by_object_id
     def __call__(self, show=True):
@@ -74,4 +75,4 @@ class TruncationNoiseWidget:
         viz.args.update(trunc_psi=self.trunc_psi, trunc_cutoff=self.trunc_cutoff, random_seed=self.noise_seed)
         viz.args.noise_mode = ('none' if not self.noise_enable else 'const' if self.noise_seed == 0 else 'random')
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------

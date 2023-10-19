@@ -17,31 +17,34 @@ from torch_utils.ops import conv2d_gradfix
 from torch_utils.ops import upfirdn2d
 from training.dual_discriminator import filtered_resizing
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 class Loss:
-    def accumulate_gradients(self, phase, real_img, real_c, gen_z, gen_c, gain, cur_nimg): # to be overridden by subclass
+    def accumulate_gradients(self, phase, real_img, real_c, gen_z, gen_c, gain, cur_nimg):  # to be overridden by subclass
         raise NotImplementedError()
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 class StyleGAN2Loss(Loss):
-    def __init__(self, device, G, D, augment_pipe=None, r1_gamma=10, style_mixing_prob=0, pl_weight=0, pl_batch_shrink=2, pl_decay=0.01, pl_no_weight_grad=False, blur_init_sigma=0, blur_fade_kimg=0, r1_gamma_init=0, r1_gamma_fade_kimg=0, neural_rendering_resolution_initial=64, neural_rendering_resolution_final=None, neural_rendering_resolution_fade_kimg=0, gpc_reg_fade_kimg=1000, gpc_reg_prob=None, dual_discrimination=False, filter_mode='antialiased'):
+    def __init__(self, device, G, D, augment_pipe=None, r1_gamma=10, style_mixing_prob=0, pl_weight=0, pl_batch_shrink=2, pl_decay=0.01, pl_no_weight_grad=False, blur_init_sigma=0, blur_fade_kimg=0, r1_gamma_init=0, r1_gamma_fade_kimg=0, neural_rendering_resolution_initial=64, neural_rendering_resolution_final=None, neural_rendering_resolution_fade_kimg=0,
+                 gpc_reg_fade_kimg=1000, gpc_reg_prob=None, dual_discrimination=False, filter_mode='antialiased'):
         super().__init__()
-        self.device             = device
-        self.G                  = G
-        self.D                  = D
-        self.augment_pipe       = augment_pipe
-        self.r1_gamma           = r1_gamma
-        self.style_mixing_prob  = style_mixing_prob
-        self.pl_weight          = pl_weight
-        self.pl_batch_shrink    = pl_batch_shrink
-        self.pl_decay           = pl_decay
-        self.pl_no_weight_grad  = pl_no_weight_grad
-        self.pl_mean            = torch.zeros([], device=device)
-        self.blur_init_sigma    = blur_init_sigma
-        self.blur_fade_kimg     = blur_fade_kimg
-        self.r1_gamma_init      = r1_gamma_init
+        self.device = device
+        self.G = G
+        self.D = D
+        self.augment_pipe = augment_pipe
+        self.r1_gamma = r1_gamma
+        self.style_mixing_prob = style_mixing_prob
+        self.pl_weight = pl_weight
+        self.pl_batch_shrink = pl_batch_shrink
+        self.pl_decay = pl_decay
+        self.pl_no_weight_grad = pl_no_weight_grad
+        self.pl_mean = torch.zeros([], device=device)
+        self.blur_init_sigma = blur_init_sigma
+        self.blur_fade_kimg = blur_fade_kimg
+        self.r1_gamma_init = r1_gamma_init
         self.r1_gamma_fade_kimg = r1_gamma_fade_kimg
         self.neural_rendering_resolution_initial = neural_rendering_resolution_initial
         self.neural_rendering_resolution_final = neural_rendering_resolution_final
@@ -50,7 +53,7 @@ class StyleGAN2Loss(Loss):
         self.gpc_reg_prob = gpc_reg_prob
         self.dual_discrimination = dual_discrimination
         self.filter_mode = filter_mode
-        self.resample_filter = upfirdn2d.setup_filter([1,3,3,1], device=device)
+        self.resample_filter = upfirdn2d.setup_filter([1, 3, 3, 1], device=device)
         self.blur_raw_target = True
         assert self.gpc_reg_prob is None or (0 <= self.gpc_reg_prob <= 1)
 
@@ -79,8 +82,8 @@ class StyleGAN2Loss(Loss):
 
         if self.augment_pipe is not None:
             augmented_pair = self.augment_pipe(torch.cat([img['image'],
-                                                    torch.nn.functional.interpolate(img['image_raw'], size=img['image'].shape[2:], mode='bilinear', antialias=True)],
-                                                    dim=1))
+                                                          torch.nn.functional.interpolate(img['image_raw'], size=img['image'].shape[2:], mode='bilinear', antialias=True)],
+                                                         dim=1))
             img['image'] = augmented_pair[:, :img['image'].shape[1]]
             img['image_raw'] = torch.nn.functional.interpolate(augmented_pair[:, img['image'].shape[1]:], size=img['image_raw'].shape[2:], mode='bilinear', antialias=True)
 
@@ -145,8 +148,8 @@ class StyleGAN2Loss(Loss):
             perturbed_coordinates = initial_coordinates + torch.randn_like(initial_coordinates) * self.G.rendering_kwargs['density_reg_p_dist']
             all_coordinates = torch.cat([initial_coordinates, perturbed_coordinates], dim=1)
             sigma = self.G.sample_mixed(all_coordinates, torch.randn_like(all_coordinates), ws, update_emas=False)['sigma']
-            sigma_initial = sigma[:, :sigma.shape[1]//2]
-            sigma_perturbed = sigma[:, sigma.shape[1]//2:]
+            sigma_initial = sigma[:, :sigma.shape[1] // 2]
+            sigma_perturbed = sigma[:, sigma.shape[1] // 2:]
 
             TVloss = torch.nn.functional.l1_loss(sigma_initial, sigma_perturbed) * self.G.rendering_kwargs['density_reg']
             TVloss.mul(gain).backward()
@@ -161,17 +164,16 @@ class StyleGAN2Loss(Loss):
 
             ws = self.G.mapping(gen_z, c_gen_conditioning, update_emas=False)
 
-            initial_coordinates = torch.rand((ws.shape[0], 2000, 3), device=ws.device) * 2 - 1 # Front
+            initial_coordinates = torch.rand((ws.shape[0], 2000, 3), device=ws.device) * 2 - 1  # Front
 
-            perturbed_coordinates = initial_coordinates + torch.tensor([0, 0, -1], device=ws.device) * (1/256) * self.G.rendering_kwargs['box_warp'] # Behind
+            perturbed_coordinates = initial_coordinates + torch.tensor([0, 0, -1], device=ws.device) * (1 / 256) * self.G.rendering_kwargs['box_warp']  # Behind
             all_coordinates = torch.cat([initial_coordinates, perturbed_coordinates], dim=1)
             sigma = self.G.sample_mixed(all_coordinates, torch.randn_like(all_coordinates), ws, update_emas=False)['sigma']
-            sigma_initial = sigma[:, :sigma.shape[1]//2]
-            sigma_perturbed = sigma[:, sigma.shape[1]//2:]
+            sigma_initial = sigma[:, :sigma.shape[1] // 2]
+            sigma_perturbed = sigma[:, sigma.shape[1] // 2:]
 
             monotonic_loss = torch.relu(sigma_initial.detach() - sigma_perturbed).mean() * 10
             monotonic_loss.mul(gain).backward()
-
 
             if swapping_prob is not None:
                 c_swapped = torch.roll(gen_c.clone(), 1, 0)
@@ -186,11 +188,11 @@ class StyleGAN2Loss(Loss):
                     cutoff = torch.where(torch.rand([], device=ws.device) < self.style_mixing_prob, cutoff, torch.full_like(cutoff, ws.shape[1]))
                     ws[:, cutoff:] = self.G.mapping(torch.randn_like(z), c, update_emas=False)[:, cutoff:]
             initial_coordinates = torch.rand((ws.shape[0], 1000, 3), device=ws.device) * 2 - 1
-            perturbed_coordinates = initial_coordinates + torch.randn_like(initial_coordinates) * (1/256) * self.G.rendering_kwargs['box_warp']
+            perturbed_coordinates = initial_coordinates + torch.randn_like(initial_coordinates) * (1 / 256) * self.G.rendering_kwargs['box_warp']
             all_coordinates = torch.cat([initial_coordinates, perturbed_coordinates], dim=1)
             sigma = self.G.sample_mixed(all_coordinates, torch.randn_like(all_coordinates), ws, update_emas=False)['sigma']
-            sigma_initial = sigma[:, :sigma.shape[1]//2]
-            sigma_perturbed = sigma[:, sigma.shape[1]//2:]
+            sigma_initial = sigma[:, :sigma.shape[1] // 2]
+            sigma_perturbed = sigma[:, sigma.shape[1] // 2:]
 
             TVloss = torch.nn.functional.l1_loss(sigma_initial, sigma_perturbed) * self.G.rendering_kwargs['density_reg']
             TVloss.mul(gain).backward()
@@ -205,17 +207,16 @@ class StyleGAN2Loss(Loss):
 
             ws = self.G.mapping(gen_z, c_gen_conditioning, update_emas=False)
 
-            initial_coordinates = torch.rand((ws.shape[0], 2000, 3), device=ws.device) * 2 - 1 # Front
+            initial_coordinates = torch.rand((ws.shape[0], 2000, 3), device=ws.device) * 2 - 1  # Front
 
-            perturbed_coordinates = initial_coordinates + torch.tensor([0, 0, -1], device=ws.device) * (1/256) * self.G.rendering_kwargs['box_warp'] # Behind
+            perturbed_coordinates = initial_coordinates + torch.tensor([0, 0, -1], device=ws.device) * (1 / 256) * self.G.rendering_kwargs['box_warp']  # Behind
             all_coordinates = torch.cat([initial_coordinates, perturbed_coordinates], dim=1)
             sigma = self.G.sample_mixed(all_coordinates, torch.randn_like(all_coordinates), ws, update_emas=False)['sigma']
-            sigma_initial = sigma[:, :sigma.shape[1]//2]
-            sigma_perturbed = sigma[:, sigma.shape[1]//2:]
+            sigma_initial = sigma[:, :sigma.shape[1] // 2]
+            sigma_perturbed = sigma[:, sigma.shape[1] // 2:]
 
             monotonic_loss = torch.relu(sigma_initial - sigma_perturbed).mean() * 10
             monotonic_loss.mul(gain).backward()
-
 
             if swapping_prob is not None:
                 c_swapped = torch.roll(gen_c.clone(), 1, 0)
@@ -230,11 +231,11 @@ class StyleGAN2Loss(Loss):
                     cutoff = torch.where(torch.rand([], device=ws.device) < self.style_mixing_prob, cutoff, torch.full_like(cutoff, ws.shape[1]))
                     ws[:, cutoff:] = self.G.mapping(torch.randn_like(z), c, update_emas=False)[:, cutoff:]
             initial_coordinates = torch.rand((ws.shape[0], 1000, 3), device=ws.device) * 2 - 1
-            perturbed_coordinates = initial_coordinates + torch.randn_like(initial_coordinates) * (1/256) * self.G.rendering_kwargs['box_warp']
+            perturbed_coordinates = initial_coordinates + torch.randn_like(initial_coordinates) * (1 / 256) * self.G.rendering_kwargs['box_warp']
             all_coordinates = torch.cat([initial_coordinates, perturbed_coordinates], dim=1)
             sigma = self.G.sample_mixed(all_coordinates, torch.randn_like(all_coordinates), ws, update_emas=False)['sigma']
-            sigma_initial = sigma[:, :sigma.shape[1]//2]
-            sigma_perturbed = sigma[:, sigma.shape[1]//2:]
+            sigma_initial = sigma[:, :sigma.shape[1] // 2]
+            sigma_perturbed = sigma[:, sigma.shape[1] // 2:]
 
             TVloss = torch.nn.functional.l1_loss(sigma_initial, sigma_perturbed) * self.G.rendering_kwargs['density_reg']
             TVloss.mul(gain).backward()
@@ -276,12 +277,12 @@ class StyleGAN2Loss(Loss):
                             r1_grads = torch.autograd.grad(outputs=[real_logits.sum()], inputs=[real_img_tmp['image'], real_img_tmp['image_raw']], create_graph=True, only_inputs=True)
                             r1_grads_image = r1_grads[0]
                             r1_grads_image_raw = r1_grads[1]
-                        r1_penalty = r1_grads_image.square().sum([1,2,3]) + r1_grads_image_raw.square().sum([1,2,3])
-                    else: # single discrimination
+                        r1_penalty = r1_grads_image.square().sum([1, 2, 3]) + r1_grads_image_raw.square().sum([1, 2, 3])
+                    else:  # single discrimination
                         with torch.autograd.profiler.record_function('r1_grads'), conv2d_gradfix.no_weight_gradients():
                             r1_grads = torch.autograd.grad(outputs=[real_logits.sum()], inputs=[real_img_tmp['image']], create_graph=True, only_inputs=True)
                             r1_grads_image = r1_grads[0]
-                        r1_penalty = r1_grads_image.square().sum([1,2,3])
+                        r1_penalty = r1_grads_image.square().sum([1, 2, 3])
                     loss_Dr1 = r1_penalty * (r1_gamma / 2)
                     training_stats.report('Loss/r1_penalty', r1_penalty)
                     training_stats.report('Loss/D/reg', loss_Dr1)
@@ -289,4 +290,4 @@ class StyleGAN2Loss(Loss):
             with torch.autograd.profiler.record_function(name + '_backward'):
                 (loss_Dreal + loss_Dr1).mean().mul(gain).backward()
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------

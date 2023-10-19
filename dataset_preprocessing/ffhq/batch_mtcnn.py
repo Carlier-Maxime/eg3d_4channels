@@ -14,6 +14,7 @@ import cv2
 import os
 from mtcnn import MTCNN
 import random
+
 detector = MTCNN()
 
 # see how to visualize the bounding box and the landmarks at : https://github.com/ipazc/mtcnn/blob/master/example.py 
@@ -42,9 +43,9 @@ for img in imgs:
         image = cv2.cvtColor(cv2.imread(src), cv2.COLOR_BGR2RGB)
         result = detector.detect_faces(image)
 
-        if len(result)>0:
+        if len(result) > 0:
             index = 0
-            if len(result)>1: # if multiple faces, take the biggest face
+            if len(result) > 1:  # if multiple faces, take the biggest face
                 size = -100000
                 for r in range(len(result)):
                     size_ = result[r]["box"][2] + result[r]["box"][3]
@@ -64,8 +65,8 @@ for img in imgs:
                 outLand = open(dst, "w")
                 outLand.write(str(float(keypoints['left_eye'][0])) + " " + str(float(keypoints['left_eye'][1])) + "\n")
                 outLand.write(str(float(keypoints['right_eye'][0])) + " " + str(float(keypoints['right_eye'][1])) + "\n")
-                outLand.write(str(float(keypoints['nose'][0])) + " " +      str(float(keypoints['nose'][1])) + "\n")
+                outLand.write(str(float(keypoints['nose'][0])) + " " + str(float(keypoints['nose'][1])) + "\n")
                 outLand.write(str(float(keypoints['mouth_left'][0])) + " " + str(float(keypoints['mouth_left'][1])) + "\n")
                 outLand.write(str(float(keypoints['mouth_right'][0])) + " " + str(float(keypoints['mouth_right'][1])) + "\n")
                 outLand.close()
-                print(result)   
+                print(result)

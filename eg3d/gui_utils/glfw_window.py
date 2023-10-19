@@ -13,23 +13,24 @@ import glfw
 import OpenGL.GL as gl
 from . import gl_utils
 
-#----------------------------------------------------------------------------
 
-class GlfwWindow: # pylint: disable=too-many-public-methods
+# ----------------------------------------------------------------------------
+
+class GlfwWindow:  # pylint: disable=too-many-public-methods
     def __init__(self, *, title='GlfwWindow', window_width=1920, window_height=1080, deferred_show=True, close_on_esc=True):
-        self._glfw_window           = None
-        self._drawing_frame         = False
-        self._frame_start_time      = None
-        self._frame_delta           = 0
-        self._fps_limit             = None
-        self._vsync                 = None
-        self._skip_frames           = 0
-        self._deferred_show         = deferred_show
-        self._close_on_esc          = close_on_esc
-        self._esc_pressed           = False
-        self._drag_and_drop_paths   = None
-        self._capture_next_frame    = False
-        self._captured_frame        = None
+        self._glfw_window = None
+        self._drawing_frame = False
+        self._frame_start_time = None
+        self._frame_delta = 0
+        self._fps_limit = None
+        self._vsync = None
+        self._skip_frames = 0
+        self._deferred_show = deferred_show
+        self._close_on_esc = close_on_esc
+        self._esc_pressed = False
+        self._drag_and_drop_paths = None
+        self._capture_next_frame = False
+        self._captured_frame = None
 
         # Create window.
         glfw.init()
@@ -50,7 +51,7 @@ class GlfwWindow: # pylint: disable=too-many-public-methods
         if self._glfw_window is not None:
             glfw.destroy_window(self._glfw_window)
             self._glfw_window = None
-        #glfw.terminate() # Commented out to play it nice with other glfw clients.
+        # glfw.terminate() # Commented out to play it nice with other glfw clients.
 
     def __del__(self):
         try:
@@ -132,7 +133,7 @@ class GlfwWindow: # pylint: disable=too-many-public-methods
     def skip_frame(self):
         self.skip_frames(1)
 
-    def skip_frames(self, num): # Do not update window for the next N frames.
+    def skip_frames(self, num):  # Do not update window for the next N frames.
         self._skip_frames = max(self._skip_frames, int(num))
 
     def is_skipping_frames(self):
@@ -151,7 +152,7 @@ class GlfwWindow: # pylint: disable=too-many-public-methods
         self._drag_and_drop_paths = None
         return paths
 
-    def draw_frame(self): # To be overridden by subclass.
+    def draw_frame(self):  # To be overridden by subclass.
         self.begin_frame()
         # Rendering code goes here.
         self.end_frame()
@@ -191,7 +192,7 @@ class GlfwWindow: # pylint: disable=too-many-public-methods
         gl.glMatrixMode(gl.GL_MODELVIEW)
         gl.glLoadIdentity()
         gl.glEnable(gl.GL_BLEND)
-        gl.glBlendFunc(gl.GL_ONE, gl.GL_ONE_MINUS_SRC_ALPHA) # Pre-multiplied alpha.
+        gl.glBlendFunc(gl.GL_ONE, gl.GL_ONE_MINUS_SRC_ALPHA)  # Pre-multiplied alpha.
 
         # Clear.
         gl.glClearColor(0, 0, 0, 1)
@@ -228,4 +229,4 @@ class GlfwWindow: # pylint: disable=too-many-public-methods
     def _glfw_drop_callback(self, _window, paths):
         self._drag_and_drop_paths = paths
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------

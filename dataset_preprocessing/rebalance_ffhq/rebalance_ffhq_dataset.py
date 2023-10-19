@@ -15,8 +15,7 @@ import zipfile
 
 from tqdm import tqdm
 
-
-#--------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------
 
 # create the new zipfile by duplicating files according to num_replicas.json
 # which is a file indicating how many times each file in the original ffhq
@@ -32,10 +31,9 @@ from tqdm import tqdm
 # but much less so than before.
 
 
-
 parser = argparse.ArgumentParser()
-parser.add_argument('inzip', type=str) # the FFHQ dataset created by `dataset_preprocessing/ffhq/runme.py`
-parser.add_argument('outzip', type=str) # this is the output path to write the new zip
+parser.add_argument('inzip', type=str)  # the FFHQ dataset created by `dataset_preprocessing/ffhq/runme.py`
+parser.add_argument('outzip', type=str)  # this is the output path to write the new zip
 args = parser.parse_args()
 
 print('Please verify that the following two md5 hashes are identical to ensure you are specifying the correct input dataset')
@@ -48,7 +46,6 @@ os.system(f'unzip -p {inzip} dataset.json | md5sum')
 num_replicas = os.path.join(os.path.dirname(__file__), 'num_replicas.json')
 with open(num_replicas) as f:
     duplicate_list = json.load(f)
-
 
 with zipfile.ZipFile(args.inzip, 'r') as zipread, zipfile.ZipFile(args.outzip, 'w') as zipwrite:
     dataset = json.loads(zipread.read('dataset.json'))

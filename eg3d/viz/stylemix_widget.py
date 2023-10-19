@@ -11,15 +11,16 @@
 import imgui
 from gui_utils import imgui_utils
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 class StyleMixingWidget:
     def __init__(self, viz):
-        self.viz        = viz
-        self.seed_def   = 1000
-        self.seed       = self.seed_def
-        self.animate    = False
-        self.enables    = []
+        self.viz = viz
+        self.seed_def = 1000
+        self.seed = self.seed_def
+        self.animate = False
+        self.enables = []
 
     @imgui_utils.scoped_by_object_id
     def __call__(self, show=True):
@@ -65,4 +66,4 @@ class StyleMixingWidget:
         if self.animate:
             self.seed += 1
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------

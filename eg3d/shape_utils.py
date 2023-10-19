@@ -20,7 +20,6 @@ Ex.
     python shape_utils.py myshapes_directory --level=12
 """
 
-
 import time
 import plyfile
 import glob
@@ -35,16 +34,16 @@ import skimage.measure
 import argparse
 import mrcfile
 from tqdm import tqdm
-        
+
 
 def convert_sdf_samples_to_ply(
-    numpy_3d_sdf_tensor,
-    voxel_grid_origin,
-    voxel_size,
-    ply_filename_out,
-    offset=None,
-    scale=None,
-    level=0.0
+        numpy_3d_sdf_tensor,
+        voxel_grid_origin,
+        voxel_size,
+        ply_filename_out,
+        offset=None,
+        scale=None,
+        level=0.0
 ):
     """
     Convert sdf samples to .ply
@@ -103,6 +102,7 @@ def convert_sdf_samples_to_ply(
 def convert_mrc(input_filename, output_filename, isosurface_level=1):
     with mrcfile.open(input_filename) as mrc:
         convert_sdf_samples_to_ply(np.transpose(mrc.data, (2, 1, 0)), [0, 0, 0], 1, output_filename, level=isosurface_level)
+
 
 if __name__ == '__main__':
     start_time = time.time()

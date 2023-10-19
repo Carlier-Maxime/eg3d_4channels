@@ -15,11 +15,11 @@ Expects cam2world matrices that use the OpenCV camera coordinate system conventi
 
 import torch
 
+
 class RaySampler(torch.nn.Module):
     def __init__(self):
         super().__init__()
         self.ray_origins_h, self.ray_directions, self.depths, self.image_coords, self.rendering_options = None, None, None, None, None
-
 
     def forward(self, cam2world_matrix, intrinsics, resolution):
         """
@@ -32,7 +32,7 @@ class RaySampler(torch.nn.Module):
         ray_origins: (N, M, 3)
         ray_dirs: (N, M, 2)
         """
-        N, M = cam2world_matrix.shape[0], resolution**2
+        N, M = cam2world_matrix.shape[0], resolution ** 2
         cam_locs_world = cam2world_matrix[:, :3, 3]
         fx = intrinsics[:, 0, 0]
         fy = intrinsics[:, 1, 1]
@@ -40,14 +40,14 @@ class RaySampler(torch.nn.Module):
         cy = intrinsics[:, 1, 2]
         sk = intrinsics[:, 0, 1]
 
-        uv = torch.stack(torch.meshgrid(torch.arange(resolution, dtype=torch.float32, device=cam2world_matrix.device), torch.arange(resolution, dtype=torch.float32, device=cam2world_matrix.device), indexing='ij')) * (1./resolution) + (0.5/resolution)
+        uv = torch.stack(torch.meshgrid(torch.arange(resolution, dtype=torch.float32, device=cam2world_matrix.device), torch.arange(resolution, dtype=torch.float32, device=cam2world_matrix.device), indexing='ij')) * (1. / resolution) + (0.5 / resolution)
         uv = uv.flip(0).reshape(2, -1).transpose(1, 0)
         uv = uv.unsqueeze(0).repeat(cam2world_matrix.shape[0], 1, 1)
         x_cam = uv[:, :, 0].view(N, -1)
         y_cam = uv[:, :, 1].view(N, -1)
         z_cam = torch.ones((N, M), device=cam2world_matrix.device)
 
-        x_lift = (x_cam - cx.unsqueeze(-1) + cy.unsqueeze(-1)*sk.unsqueeze(-1)/fy.unsqueeze(-1) - sk.unsqueeze(-1)*y_cam/fy.unsqueeze(-1)) / fx.unsqueeze(-1) * z_cam
+        x_lift = (x_cam - cx.unsqueeze(-1) + cy.unsqueeze(-1) * sk.unsqueeze(-1) / fy.unsqueeze(-1) - sk.unsqueeze(-1) * y_cam / fy.unsqueeze(-1)) / fx.unsqueeze(-1) * z_cam
         y_lift = (y_cam - cy.unsqueeze(-1)) / fy.unsqueeze(-1) * z_cam
 
         cam_rel_points = torch.stack((x_lift, y_lift, z_cam, torch.ones_like(z_cam)), dim=-1)

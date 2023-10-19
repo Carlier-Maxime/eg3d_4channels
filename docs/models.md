@@ -41,6 +41,7 @@ python train.py --outdir=~/training-runs --cfg=ffhq --data=~/datasets/FFHQ_rebal
 ```
 
 **ffhqrebalanced512-128.pkl**
+
 ```.bash
 # Finetune with rebalanced FFHQ at 128 neural rendering resolution.
 python train.py --outdir=~/training-runs --cfg=ffhq --data=~/datasets/FFHQ_rebalanced_512.zip \
@@ -58,7 +59,6 @@ python train.py --outdir=~/training-runs --cfg=afhq --data=~/datasets/afhq.zip \
   --resume=ffhq-64.pkl \
   --gpus=8 --batch=32 --gamma=5 --aug=ada --gen_pose_cond=True --gpc_reg_prob=0.8 --neural_rendering_resolution_final=128
 ```
-
 
 # Shapenet
 

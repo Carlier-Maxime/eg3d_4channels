@@ -15,19 +15,19 @@ import subprocess
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
-#--------------------------------------------------------------------------------------------------------#
+# --------------------------------------------------------------------------------------------------------#
 
 # Download wilds
 cmd = "python download_ffhq.py --wilds"
 subprocess.run([cmd], shell=True, check=True)
 
-#--------------------------------------------------------------------------------------------------------#
+# --------------------------------------------------------------------------------------------------------#
 
 # Validate wilds
 cmd = "python validate_ffhq.py"
 subprocess.run([cmd], shell=True, check=True)
 
-#--------------------------------------------------------------------------------------------------------#
+# --------------------------------------------------------------------------------------------------------#
 
 # Align wilds
 cmd = "python align_multiprocess.py --source=. --dest=realign1500 --threads=16"
@@ -39,7 +39,7 @@ subprocess.run([cmd], shell=True, check=True)
 realign1500_dir = 'realign1500'
 for subdir in os.listdir(realign1500_dir):
     if not os.path.isdir(os.path.join(realign1500_dir, subdir)): continue
-    if not(len(subdir) == 5 and subdir.isnumeric()): continue
+    if not (len(subdir) == 5 and subdir.isnumeric()): continue
     for filename in os.listdir(os.path.join(realign1500_dir, subdir)):
         shutil.move(os.path.join(realign1500_dir, subdir, filename), os.path.join(realign1500_dir, filename))
 
@@ -48,7 +48,7 @@ for subdir in os.listdir(realign1500_dir):
 print("Downloading cropping params...")
 gdown.download('https://drive.google.com/uc?id=1KdVf2lIepGECRaANGhfuR7mDpJ5nfb9K', 'realign1500/cropping_params.json', quiet=False)
 
-#--------------------------------------------------------------------------------------------------------#
+# --------------------------------------------------------------------------------------------------------#
 
 # Perform final cropping of 512x512 images.
 print("Processing final crops...")
@@ -69,7 +69,7 @@ subprocess.run([cmd], shell=True, check=True)
 print("Downloading poses...")
 gdown.download('https://drive.google.com/uc?id=14mzYD1DxUjh7BGgeWKgXtLHWwvr-he1Z', 'final_crops/dataset.json', quiet=False)
 
-#--------------------------------------------------------------------------------------------------------#
+# --------------------------------------------------------------------------------------------------------#
 
 print("Creating dataset zip...")
 cmd = f"python {os.path.join(dir_path, '../../eg3d', 'dataset_tool.py')}"

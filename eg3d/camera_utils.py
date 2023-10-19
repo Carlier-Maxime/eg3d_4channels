@@ -19,6 +19,7 @@ import torch.nn as nn
 
 from training.volumetric_rendering import math_utils
 
+
 class GaussianCameraPoseSampler:
     """
     Samples pitch and yaw from a Gaussian distribution and returns a camera pose.
@@ -43,13 +44,13 @@ class GaussianCameraPoseSampler:
 
         theta = h
         v = v / math.pi
-        phi = torch.arccos(1 - 2*v)
+        phi = torch.arccos(1 - 2 * v)
 
         camera_origins = torch.zeros((batch_size, 3), device=device)
 
-        camera_origins[:, 0:1] = radius*torch.sin(phi) * torch.cos(math.pi-theta)
-        camera_origins[:, 2:3] = radius*torch.sin(phi) * torch.sin(math.pi-theta)
-        camera_origins[:, 1:2] = radius*torch.cos(phi)
+        camera_origins[:, 0:1] = radius * torch.sin(phi) * torch.cos(math.pi - theta)
+        camera_origins[:, 2:3] = radius * torch.sin(phi) * torch.sin(math.pi - theta)
+        camera_origins[:, 1:2] = radius * torch.cos(phi)
 
         forward_vectors = math_utils.normalize_vecs(-camera_origins)
         return create_cam2world_matrix(forward_vectors, camera_origins)
@@ -73,17 +74,18 @@ class LookAtPoseSampler:
 
         theta = h
         v = v / math.pi
-        phi = torch.arccos(1 - 2*v)
+        phi = torch.arccos(1 - 2 * v)
 
         camera_origins = torch.zeros((batch_size, 3), device=device)
 
-        camera_origins[:, 0:1] = radius*torch.sin(phi) * torch.cos(math.pi-theta)
-        camera_origins[:, 2:3] = radius*torch.sin(phi) * torch.sin(math.pi-theta)
-        camera_origins[:, 1:2] = radius*torch.cos(phi)
+        camera_origins[:, 0:1] = radius * torch.sin(phi) * torch.cos(math.pi - theta)
+        camera_origins[:, 2:3] = radius * torch.sin(phi) * torch.sin(math.pi - theta)
+        camera_origins[:, 1:2] = radius * torch.cos(phi)
 
         # forward_vectors = math_utils.normalize_vecs(-camera_origins)
         forward_vectors = math_utils.normalize_vecs(lookat_position - camera_origins)
         return create_cam2world_matrix(forward_vectors, camera_origins)
+
 
 class UniformCameraPoseSampler:
     """
@@ -104,16 +106,17 @@ class UniformCameraPoseSampler:
 
         theta = h
         v = v / math.pi
-        phi = torch.arccos(1 - 2*v)
+        phi = torch.arccos(1 - 2 * v)
 
         camera_origins = torch.zeros((batch_size, 3), device=device)
 
-        camera_origins[:, 0:1] = radius*torch.sin(phi) * torch.cos(math.pi-theta)
-        camera_origins[:, 2:3] = radius*torch.sin(phi) * torch.sin(math.pi-theta)
-        camera_origins[:, 1:2] = radius*torch.cos(phi)
+        camera_origins[:, 0:1] = radius * torch.sin(phi) * torch.cos(math.pi - theta)
+        camera_origins[:, 2:3] = radius * torch.sin(phi) * torch.sin(math.pi - theta)
+        camera_origins[:, 1:2] = radius * torch.cos(phi)
 
         forward_vectors = math_utils.normalize_vecs(-camera_origins)
-        return create_cam2world_matrix(forward_vectors, camera_origins)    
+        return create_cam2world_matrix(forward_vectors, camera_origins)
+
 
 def create_cam2world_matrix(forward_vector, origin):
     """
@@ -133,7 +136,7 @@ def create_cam2world_matrix(forward_vector, origin):
     translation_matrix = torch.eye(4, device=origin.device).unsqueeze(0).repeat(forward_vector.shape[0], 1, 1)
     translation_matrix[:, :3, 3] = origin
     cam2world = (translation_matrix @ rotation_matrix)[:, :, :]
-    assert(cam2world.shape[1:] == (4, 4))
+    assert (cam2world.shape[1:] == (4, 4))
     return cam2world
 
 

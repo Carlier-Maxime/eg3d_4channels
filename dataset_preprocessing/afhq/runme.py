@@ -18,10 +18,9 @@ import subprocess
 import gdown
 
 parser = argparse.ArgumentParser()
-parser.add_argument('inzip', type=str) # the AFHQ zip downloaded from starganV2 (https://github.com/clovaai/stargan-v2)
-parser.add_argument('outzip', type=str, required=False, default='processed_afhq.zip') # this is the output path to write the new zip
+parser.add_argument('inzip', type=str)  # the AFHQ zip downloaded from starganV2 (https://github.com/clovaai/stargan-v2)
+parser.add_argument('outzip', type=str, required=False, default='processed_afhq.zip')  # this is the output path to write the new zip
 args = parser.parse_args()
-
 
 eg3d_root = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..')
 
@@ -35,13 +34,13 @@ mirror_tool_path = os.path.join(eg3d_root, 'dataset_preprocessing', 'mirror_data
 try:
     sys.path.append(os.path.dirname(dataset_tool_path))
     import dataset_tool
+
     sys.path.append(os.path.dirname(mirror_tool_path))
     import mirror_dataset
 except Exception as e:
     print(e)
     print("There was a problem while importing the dataset_tool. Are you in the correct virtual environment?")
     exit()
-
 
 with tempfile.TemporaryDirectory() as working_dir:
     cmd = f"""
@@ -50,11 +49,9 @@ with tempfile.TemporaryDirectory() as working_dir:
     """
     subprocess.run([cmd], shell=True, check=True)
 
-
     """Download dataset.json file"""
     json_url = 'https://drive.google.com/file/d/1FQXQ26kAgRyN2iOH8CBl3P9CGPIQ5TAQ/view?usp=sharing'
     gdown.download(json_url, f'{working_dir}/cat_images/dataset.json', quiet=False, fuzzy=True)
-
 
     print("Mirroring dataset...")
     cmd = f"""
@@ -63,7 +60,6 @@ with tempfile.TemporaryDirectory() as working_dir:
             --dest={working_dir}/mirrored_images
     """
     subprocess.run([cmd], shell=True, check=True)
-
 
     print("Creating dataset zip...")
     cmd = f"""

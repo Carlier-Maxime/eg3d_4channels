@@ -14,12 +14,13 @@ import imgui
 import dnnlib
 from gui_utils import imgui_utils
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 class ZoomWidget:
     def __init__(self, viz):
-        self.viz         = viz
-        self.fov         = 18.837
+        self.viz = viz
+        self.fov = 18.837
         self.fov_default = 18.837
 
     @imgui_utils.scoped_by_object_id
@@ -40,4 +41,4 @@ class ZoomWidget:
                 self.fov = self.fov_default
 
         viz.args.focal_length = float(1 / (np.tan(self.fov * 3.14159 / 360) * 1.414))
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------

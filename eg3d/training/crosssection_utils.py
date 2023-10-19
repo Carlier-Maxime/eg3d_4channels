@@ -10,9 +10,10 @@
 
 import torch
 
+
 def sample_cross_section(G, ws, resolution=256, w=1.2):
-    axis=0
-    A, B = torch.meshgrid(torch.linspace(w/2, -w/2, resolution, device=ws.device), torch.linspace(-w/2, w/2, resolution, device=ws.device), indexing='ij')
+    axis = 0
+    A, B = torch.meshgrid(torch.linspace(w / 2, -w / 2, resolution, device=ws.device), torch.linspace(-w / 2, w / 2, resolution, device=ws.device), indexing='ij')
     A, B = A.reshape(-1, 1), B.reshape(-1, 1)
     C = torch.zeros_like(A)
     coordinates = [A, B]

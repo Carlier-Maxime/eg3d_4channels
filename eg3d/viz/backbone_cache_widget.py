@@ -11,11 +11,12 @@
 import imgui
 from gui_utils import imgui_utils
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 class BackboneCacheWidget:
     def __init__(self, viz):
-        self.viz            = viz
+        self.viz = viz
         self.cache_backbone = True
 
     @imgui_utils.scoped_by_object_id
@@ -31,4 +32,4 @@ class BackboneCacheWidget:
 
         viz.args.do_backbone_caching = self.cache_backbone
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------

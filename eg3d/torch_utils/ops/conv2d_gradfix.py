@@ -18,10 +18,11 @@ import torch
 # pylint: disable=arguments-differ
 # pylint: disable=protected-access
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 
-enabled = False                     # Enable the custom op by setting this to true.
-weight_gradients_disabled = False   # Forcefully disable computation of gradients with respect to the weights.
+enabled = False  # Enable the custom op by setting this to true.
+weight_gradients_disabled = False  # Forcefully disable computation of gradients with respect to the weights.
+
 
 @contextlib.contextmanager
 def no_weight_gradients(disable=True):
@@ -32,19 +33,22 @@ def no_weight_gradients(disable=True):
     yield
     weight_gradients_disabled = old
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def conv2d(input, weight, bias=None, stride=1, padding=0, dilation=1, groups=1):
     if _should_use_custom_op(input):
         return _conv2d_gradfix(transpose=False, weight_shape=weight.shape, stride=stride, padding=padding, output_padding=0, dilation=dilation, groups=groups).apply(input, weight, bias)
     return torch.nn.functional.conv2d(input=input, weight=weight, bias=bias, stride=stride, padding=padding, dilation=dilation, groups=groups)
 
+
 def conv_transpose2d(input, weight, bias=None, stride=1, padding=0, output_padding=0, groups=1, dilation=1):
     if _should_use_custom_op(input):
         return _conv2d_gradfix(transpose=True, weight_shape=weight.shape, stride=stride, padding=padding, output_padding=output_padding, groups=groups, dilation=dilation).apply(input, weight, bias)
     return torch.nn.functional.conv_transpose2d(input=input, weight=weight, bias=bias, stride=stride, padding=padding, output_padding=output_padding, groups=groups, dilation=dilation)
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def _should_use_custom_op(input):
     assert isinstance(input, torch.Tensor)
@@ -54,16 +58,19 @@ def _should_use_custom_op(input):
         return False
     return True
 
+
 def _tuple_of_ints(xs, ndim):
     xs = tuple(xs) if isinstance(xs, (tuple, list)) else (xs,) * ndim
     assert len(xs) == ndim
     assert all(isinstance(x, int) for x in xs)
     return xs
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 _conv2d_gradfix_cache = dict()
 _null_tensor = torch.empty([0])
+
 
 def _conv2d_gradfix(transpose, weight_shape, stride, padding, output_padding, dilation, groups):
     # Parse arguments.
@@ -87,11 +94,12 @@ def _conv2d_gradfix(transpose, weight_shape, stride, padding, output_padding, di
     assert all(dilation[i] >= 0 for i in range(ndim))
     if not transpose:
         assert all(output_padding[i] == 0 for i in range(ndim))
-    else: # transpose
+    else:  # transpose
         assert all(0 <= output_padding[i] < max(stride[i], dilation[i]) for i in range(ndim))
 
     # Helpers.
     common_kwargs = dict(stride=stride, padding=padding, dilation=dilation, groups=groups)
+
     def calc_output_padding(input_shape, output_shape):
         if transpose:
             return [0, 0]
@@ -172,7 +180,6 @@ def _conv2d_gradfix(transpose, weight_shape, stride, padding, output_padding, di
             # General case => cuDNN.
             return torch.ops.aten.convolution_backward(grad_output=grad_output, input=input, weight=weight, bias_sizes=None, stride=stride, padding=padding, dilation=dilation, transposed=transpose, output_padding=output_padding, groups=groups, output_mask=[False, True, False])[1]
 
-
         @staticmethod
         def backward(ctx, grad2_grad_weight):
             grad_output, input = ctx.saved_tensors
@@ -196,4 +203,4 @@ def _conv2d_gradfix(transpose, weight_shape, stride, padding, output_padding, di
     _conv2d_gradfix_cache[key] = Conv2d
     return Conv2d
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------

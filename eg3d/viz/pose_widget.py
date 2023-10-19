@@ -13,22 +13,23 @@ import imgui
 import dnnlib
 from gui_utils import imgui_utils
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 class PoseWidget:
     def __init__(self, viz):
-        self.viz        = viz
-        self.pose       = dnnlib.EasyDict(yaw=0, pitch=0, anim=False, speed=0.25)
-        self.pose_def   = dnnlib.EasyDict(self.pose)
+        self.viz = viz
+        self.pose = dnnlib.EasyDict(yaw=0, pitch=0, anim=False, speed=0.25)
+        self.pose_def = dnnlib.EasyDict(self.pose)
 
         self.lookat_point_choice = 0
-        self.lookat_point_option = ['auto',         'ffhq',            'shapenet',         'afhq',         'manual']
-        self.lookat_point_labels = ['Auto Detect',  'FFHQ Default',    'Shapenet Default', 'AFHQ Default', 'Manual']
+        self.lookat_point_option = ['auto', 'ffhq', 'shapenet', 'afhq', 'manual']
+        self.lookat_point_labels = ['Auto Detect', 'FFHQ Default', 'Shapenet Default', 'AFHQ Default', 'Manual']
         self.lookat_point = (0.0, 0.0, 0.2)
 
     def drag(self, dx, dy):
         viz = self.viz
-        self.pose.yaw   += -dx / viz.font_size * 3e-2
+        self.pose.yaw += -dx / viz.font_size * 3e-2
         self.pose.pitch += -dy / viz.font_size * 3e-2
 
     @imgui_utils.scoped_by_object_id
@@ -66,27 +67,26 @@ class PoseWidget:
                 self.lookat_point = None
             if lookat_point == 'ffhq':
                 self.lookat_point = (0.0, 0.0, 0.2)
-                changes_enabled=False
+                changes_enabled = False
             if lookat_point == 'shapenet':
                 self.lookat_point = (0.0, 0.0, 0.0)
-                changes_enabled=False
+                changes_enabled = False
             if lookat_point == 'afhq':
                 self.lookat_point = (0.0, 0.0, 0.0)
-                changes_enabled=False
+                changes_enabled = False
             if lookat_point == 'manual':
                 if self.lookat_point is None:
                     self.lookat_point = (0.0, 0.0, 0.0)
-                changes_enabled=True
+                changes_enabled = True
             if lookat_point != 'auto':
                 imgui.same_line(viz.label_w + viz.font_size * 13 + viz.spacing * 2)
                 with imgui_utils.item_width(viz.font_size * 16):
                     with imgui_utils.grayed_out(not changes_enabled):
                         _changed, self.lookat_point = imgui.input_float3('##lookat', *self.lookat_point, format='%.2f', flags=(imgui.INPUT_TEXT_READ_ONLY if not changes_enabled else 0))
 
-
-        viz.args.yaw   = self.pose.yaw
+        viz.args.yaw = self.pose.yaw
         viz.args.pitch = self.pose.pitch
 
         viz.args.lookat_point = self.lookat_point
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------

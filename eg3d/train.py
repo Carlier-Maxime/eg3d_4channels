@@ -27,7 +27,8 @@ from metrics import metric_main
 from torch_utils import training_stats
 from torch_utils import custom_ops
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def subprocess_fn(rank, c, temp_dir):
     dnnlib.util.Logger(file_name=os.path.join(c.run_dir, 'log.txt'), file_mode='a', should_flush=True)
@@ -51,7 +52,8 @@ def subprocess_fn(rank, c, temp_dir):
     # Execute training loop.
     training_loop.training_loop(rank=rank, **c)
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def launch_training(c, desc, outdir, dry_run):
     dnnlib.util.Logger(should_flush=True)
@@ -102,20 +104,22 @@ def launch_training(c, desc, outdir, dry_run):
         else:
             torch.multiprocessing.spawn(fn=subprocess_fn, args=(c, temp_dir), nprocs=c.num_gpus)
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def init_dataset_kwargs(data):
     try:
         dataset_kwargs = dnnlib.EasyDict(class_name='training.dataset.ImageFolderDataset', path=data, use_labels=True, max_size=None, xflip=False)
-        dataset_obj = dnnlib.util.construct_class_by_name(**dataset_kwargs) # Subclass of training.dataset.Dataset.
-        dataset_kwargs.resolution = dataset_obj.resolution # Be explicit about resolution.
-        dataset_kwargs.use_labels = dataset_obj.has_labels # Be explicit about labels.
-        dataset_kwargs.max_size = len(dataset_obj) # Be explicit about dataset size.
+        dataset_obj = dnnlib.util.construct_class_by_name(**dataset_kwargs)  # Subclass of training.dataset.Dataset.
+        dataset_kwargs.resolution = dataset_obj.resolution  # Be explicit about resolution.
+        dataset_kwargs.use_labels = dataset_obj.has_labels  # Be explicit about labels.
+        dataset_kwargs.max_size = len(dataset_obj)  # Be explicit about dataset size.
         return dataset_kwargs, dataset_obj.name
     except IOError as err:
         raise click.ClickException(f'--data: {err}')
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def parse_comma_separated_list(s):
     if isinstance(s, list):
@@ -124,75 +128,69 @@ def parse_comma_separated_list(s):
         return []
     return s.split(',')
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 @click.command()
-
 # Required.
-@click.option('--outdir',       help='Where to save the results', metavar='DIR',                required=True)
-@click.option('--cfg',          help='Base configuration',                                      type=str, required=True)
-@click.option('--data',         help='Training data', metavar='[ZIP|DIR]',                      type=str, required=True)
-@click.option('--gpus',         help='Number of GPUs to use', metavar='INT',                    type=click.IntRange(min=1), required=True)
-@click.option('--batch',        help='Total batch size', metavar='INT',                         type=click.IntRange(min=1), required=True)
-@click.option('--gamma',        help='R1 regularization weight', metavar='FLOAT',               type=click.FloatRange(min=0), required=True)
-
+@click.option('--outdir', help='Where to save the results', metavar='DIR', required=True)
+@click.option('--cfg', help='Base configuration', type=str, required=True)
+@click.option('--data', help='Training data', metavar='[ZIP|DIR]', type=str, required=True)
+@click.option('--gpus', help='Number of GPUs to use', metavar='INT', type=click.IntRange(min=1), required=True)
+@click.option('--batch', help='Total batch size', metavar='INT', type=click.IntRange(min=1), required=True)
+@click.option('--gamma', help='R1 regularization weight', metavar='FLOAT', type=click.FloatRange(min=0), required=True)
 # Optional features.
-@click.option('--cond',         help='Train conditional model', metavar='BOOL',                 type=bool, default=True, show_default=True)
-@click.option('--mirror',       help='Enable dataset x-flips', metavar='BOOL',                  type=bool, default=False, show_default=True)
-@click.option('--aug',          help='Augmentation mode',                                       type=click.Choice(['noaug', 'ada', 'fixed']), default='noaug', show_default=True)
-@click.option('--resume',       help='Resume from given network pickle', metavar='[PATH|URL]',  type=str)
-@click.option('--freezed',      help='Freeze first layers of D', metavar='INT',                 type=click.IntRange(min=0), default=0, show_default=True)
-
+@click.option('--cond', help='Train conditional model', metavar='BOOL', type=bool, default=True, show_default=True)
+@click.option('--mirror', help='Enable dataset x-flips', metavar='BOOL', type=bool, default=False, show_default=True)
+@click.option('--aug', help='Augmentation mode', type=click.Choice(['noaug', 'ada', 'fixed']), default='noaug', show_default=True)
+@click.option('--resume', help='Resume from given network pickle', metavar='[PATH|URL]', type=str)
+@click.option('--freezed', help='Freeze first layers of D', metavar='INT', type=click.IntRange(min=0), default=0, show_default=True)
 # Misc hyperparameters.
-@click.option('--p',            help='Probability for --aug=fixed', metavar='FLOAT',            type=click.FloatRange(min=0, max=1), default=0.2, show_default=True)
-@click.option('--target',       help='Target value for --aug=ada', metavar='FLOAT',             type=click.FloatRange(min=0, max=1), default=0.6, show_default=True)
-@click.option('--batch-gpu',    help='Limit batch size per GPU', metavar='INT',                 type=click.IntRange(min=1))
-@click.option('--cbase',        help='Capacity multiplier', metavar='INT',                      type=click.IntRange(min=1), default=32768, show_default=True)
-@click.option('--cmax',         help='Max. feature maps', metavar='INT',                        type=click.IntRange(min=1), default=512, show_default=True)
-@click.option('--glr',          help='G learning rate  [default: varies]', metavar='FLOAT',     type=click.FloatRange(min=0))
-@click.option('--dlr',          help='D learning rate', metavar='FLOAT',                        type=click.FloatRange(min=0), default=0.002, show_default=True)
-@click.option('--map-depth',    help='Mapping network depth  [default: varies]', metavar='INT', type=click.IntRange(min=1), default=2, show_default=True)
-@click.option('--mbstd-group',  help='Minibatch std group size', metavar='INT',                 type=click.IntRange(min=1), default=4, show_default=True)
-
+@click.option('--p', help='Probability for --aug=fixed', metavar='FLOAT', type=click.FloatRange(min=0, max=1), default=0.2, show_default=True)
+@click.option('--target', help='Target value for --aug=ada', metavar='FLOAT', type=click.FloatRange(min=0, max=1), default=0.6, show_default=True)
+@click.option('--batch-gpu', help='Limit batch size per GPU', metavar='INT', type=click.IntRange(min=1))
+@click.option('--cbase', help='Capacity multiplier', metavar='INT', type=click.IntRange(min=1), default=32768, show_default=True)
+@click.option('--cmax', help='Max. feature maps', metavar='INT', type=click.IntRange(min=1), default=512, show_default=True)
+@click.option('--glr', help='G learning rate  [default: varies]', metavar='FLOAT', type=click.FloatRange(min=0))
+@click.option('--dlr', help='D learning rate', metavar='FLOAT', type=click.FloatRange(min=0), default=0.002, show_default=True)
+@click.option('--map-depth', help='Mapping network depth  [default: varies]', metavar='INT', type=click.IntRange(min=1), default=2, show_default=True)
+@click.option('--mbstd-group', help='Minibatch std group size', metavar='INT', type=click.IntRange(min=1), default=4, show_default=True)
 # Misc settings.
-@click.option('--desc',         help='String to include in result dir name', metavar='STR',     type=str)
-@click.option('--metrics',      help='Quality metrics', metavar='[NAME|A,B,C|none]',            type=parse_comma_separated_list, default='fid50k_full', show_default=True)
-@click.option('--kimg',         help='Total training duration', metavar='KIMG',                 type=click.IntRange(min=1), default=25000, show_default=True)
-@click.option('--tick',         help='How often to print progress', metavar='KIMG',             type=click.IntRange(min=1), default=4, show_default=True)
-@click.option('--snap',         help='How often to save snapshots', metavar='TICKS',            type=click.IntRange(min=1), default=50, show_default=True)
-@click.option('--seed',         help='Random seed', metavar='INT',                              type=click.IntRange(min=0), default=0, show_default=True)
+@click.option('--desc', help='String to include in result dir name', metavar='STR', type=str)
+@click.option('--metrics', help='Quality metrics', metavar='[NAME|A,B,C|none]', type=parse_comma_separated_list, default='fid50k_full', show_default=True)
+@click.option('--kimg', help='Total training duration', metavar='KIMG', type=click.IntRange(min=1), default=25000, show_default=True)
+@click.option('--tick', help='How often to print progress', metavar='KIMG', type=click.IntRange(min=1), default=4, show_default=True)
+@click.option('--snap', help='How often to save snapshots', metavar='TICKS', type=click.IntRange(min=1), default=50, show_default=True)
+@click.option('--seed', help='Random seed', metavar='INT', type=click.IntRange(min=0), default=0, show_default=True)
 # @click.option('--fp32',         help='Disable mixed-precision', metavar='BOOL',                 type=bool, default=False, show_default=True)
-@click.option('--nobench',      help='Disable cuDNN benchmarking', metavar='BOOL',              type=bool, default=False, show_default=True)
-@click.option('--workers',      help='DataLoader worker processes', metavar='INT',              type=click.IntRange(min=1), default=3, show_default=True)
-@click.option('-n','--dry-run', help='Print training options and exit',                         is_flag=True)
-
+@click.option('--nobench', help='Disable cuDNN benchmarking', metavar='BOOL', type=bool, default=False, show_default=True)
+@click.option('--workers', help='DataLoader worker processes', metavar='INT', type=click.IntRange(min=1), default=3, show_default=True)
+@click.option('-n', '--dry-run', help='Print training options and exit', is_flag=True)
 # @click.option('--sr_module',    help='Superresolution module', metavar='STR',  type=str, required=True)
-@click.option('--neural_rendering_resolution_initial', help='Resolution to render at', metavar='INT',  type=click.IntRange(min=1), default=64, required=False)
-@click.option('--neural_rendering_resolution_final', help='Final resolution to render at, if blending', metavar='INT',  type=click.IntRange(min=1), required=False, default=None)
-@click.option('--neural_rendering_resolution_fade_kimg', help='Kimg to blend resolution over', metavar='INT',  type=click.IntRange(min=0), required=False, default=1000, show_default=True)
-
-@click.option('--blur_fade_kimg', help='Blur over how many', metavar='INT',  type=click.IntRange(min=1), required=False, default=200)
-@click.option('--gen_pose_cond', help='If true, enable generator pose conditioning.', metavar='BOOL',  type=bool, required=False, default=False)
-@click.option('--c-scale', help='Scale factor for generator pose conditioning.', metavar='FLOAT',  type=click.FloatRange(min=0), required=False, default=1)
-@click.option('--c-noise', help='Add noise for generator pose conditioning.', metavar='FLOAT',  type=click.FloatRange(min=0), required=False, default=0)
-@click.option('--gpc_reg_prob', help='Strength of swapping regularization. None means no generator pose conditioning, i.e. condition with zeros.', metavar='FLOAT',  type=click.FloatRange(min=0), required=False, default=0.5)
-@click.option('--gpc_reg_fade_kimg', help='Length of swapping prob fade', metavar='INT',  type=click.IntRange(min=0), required=False, default=1000)
-@click.option('--disc_c_noise', help='Strength of discriminator pose conditioning regularization, in standard deviations.', metavar='FLOAT',  type=click.FloatRange(min=0), required=False, default=0)
-@click.option('--sr_noise_mode', help='Type of noise for superresolution', metavar='STR',  type=click.Choice(['random', 'none']), required=False, default='none')
-@click.option('--resume_blur', help='Enable to blur even on resume', metavar='BOOL',  type=bool, required=False, default=False)
-@click.option('--sr_num_fp16_res',    help='Number of fp16 layers in superresolution', metavar='INT', type=click.IntRange(min=0), default=4, required=False, show_default=True)
-@click.option('--g_num_fp16_res',    help='Number of fp16 layers in generator', metavar='INT', type=click.IntRange(min=0), default=0, required=False, show_default=True)
-@click.option('--d_num_fp16_res',    help='Number of fp16 layers in discriminator', metavar='INT', type=click.IntRange(min=0), default=4, required=False, show_default=True)
-@click.option('--sr_first_cutoff',    help='First cutoff for AF superresolution', metavar='INT', type=click.IntRange(min=2), default=2, required=False, show_default=True)
-@click.option('--sr_first_stopband',    help='First cutoff for AF superresolution', metavar='FLOAT', type=click.FloatRange(min=2), default=2**2.1, required=False, show_default=True)
-@click.option('--style_mixing_prob',    help='Style-mixing regularization probability for training.', metavar='FLOAT', type=click.FloatRange(min=0, max=1), default=0, required=False, show_default=True)
-@click.option('--sr-module',    help='Superresolution module override', metavar='STR',  type=str, required=False, default=None)
-@click.option('--density_reg',    help='Density regularization strength.', metavar='FLOAT', type=click.FloatRange(min=0), default=0.25, required=False, show_default=True)
-@click.option('--density_reg_every',    help='lazy density reg', metavar='int', type=click.FloatRange(min=1), default=4, required=False, show_default=True)
-@click.option('--density_reg_p_dist',    help='density regularization strength.', metavar='FLOAT', type=click.FloatRange(min=0), default=0.004, required=False, show_default=True)
-@click.option('--reg_type', help='Type of regularization', metavar='STR',  type=click.Choice(['l1', 'l1-alt', 'monotonic-detach', 'monotonic-fixed', 'total-variation']), required=False, default='l1')
-@click.option('--decoder_lr_mul',    help='decoder learning rate multiplier.', metavar='FLOAT', type=click.FloatRange(min=0), default=1, required=False, show_default=True)
-
+@click.option('--neural_rendering_resolution_initial', help='Resolution to render at', metavar='INT', type=click.IntRange(min=1), default=64, required=False)
+@click.option('--neural_rendering_resolution_final', help='Final resolution to render at, if blending', metavar='INT', type=click.IntRange(min=1), required=False, default=None)
+@click.option('--neural_rendering_resolution_fade_kimg', help='Kimg to blend resolution over', metavar='INT', type=click.IntRange(min=0), required=False, default=1000, show_default=True)
+@click.option('--blur_fade_kimg', help='Blur over how many', metavar='INT', type=click.IntRange(min=1), required=False, default=200)
+@click.option('--gen_pose_cond', help='If true, enable generator pose conditioning.', metavar='BOOL', type=bool, required=False, default=False)
+@click.option('--c-scale', help='Scale factor for generator pose conditioning.', metavar='FLOAT', type=click.FloatRange(min=0), required=False, default=1)
+@click.option('--c-noise', help='Add noise for generator pose conditioning.', metavar='FLOAT', type=click.FloatRange(min=0), required=False, default=0)
+@click.option('--gpc_reg_prob', help='Strength of swapping regularization. None means no generator pose conditioning, i.e. condition with zeros.', metavar='FLOAT', type=click.FloatRange(min=0), required=False, default=0.5)
+@click.option('--gpc_reg_fade_kimg', help='Length of swapping prob fade', metavar='INT', type=click.IntRange(min=0), required=False, default=1000)
+@click.option('--disc_c_noise', help='Strength of discriminator pose conditioning regularization, in standard deviations.', metavar='FLOAT', type=click.FloatRange(min=0), required=False, default=0)
+@click.option('--sr_noise_mode', help='Type of noise for superresolution', metavar='STR', type=click.Choice(['random', 'none']), required=False, default='none')
+@click.option('--resume_blur', help='Enable to blur even on resume', metavar='BOOL', type=bool, required=False, default=False)
+@click.option('--sr_num_fp16_res', help='Number of fp16 layers in superresolution', metavar='INT', type=click.IntRange(min=0), default=4, required=False, show_default=True)
+@click.option('--g_num_fp16_res', help='Number of fp16 layers in generator', metavar='INT', type=click.IntRange(min=0), default=0, required=False, show_default=True)
+@click.option('--d_num_fp16_res', help='Number of fp16 layers in discriminator', metavar='INT', type=click.IntRange(min=0), default=4, required=False, show_default=True)
+@click.option('--sr_first_cutoff', help='First cutoff for AF superresolution', metavar='INT', type=click.IntRange(min=2), default=2, required=False, show_default=True)
+@click.option('--sr_first_stopband', help='First cutoff for AF superresolution', metavar='FLOAT', type=click.FloatRange(min=2), default=2 ** 2.1, required=False, show_default=True)
+@click.option('--style_mixing_prob', help='Style-mixing regularization probability for training.', metavar='FLOAT', type=click.FloatRange(min=0, max=1), default=0, required=False, show_default=True)
+@click.option('--sr-module', help='Superresolution module override', metavar='STR', type=str, required=False, default=None)
+@click.option('--density_reg', help='Density regularization strength.', metavar='FLOAT', type=click.FloatRange(min=0), default=0.25, required=False, show_default=True)
+@click.option('--density_reg_every', help='lazy density reg', metavar='int', type=click.FloatRange(min=1), default=4, required=False, show_default=True)
+@click.option('--density_reg_p_dist', help='density regularization strength.', metavar='FLOAT', type=click.FloatRange(min=0), default=0.004, required=False, show_default=True)
+@click.option('--reg_type', help='Type of regularization', metavar='STR', type=click.Choice(['l1', 'l1-alt', 'monotonic-detach', 'monotonic-fixed', 'total-variation']), required=False, default='l1')
+@click.option('--decoder_lr_mul', help='decoder learning rate multiplier.', metavar='FLOAT', type=click.FloatRange(min=0), default=1, required=False, show_default=True)
 def main(**kwargs):
     """Train a GAN using the techniques described in the paper
     "Alias-Free Generative Adversarial Networks".
@@ -217,12 +215,12 @@ def main(**kwargs):
     """
 
     # Initialize config.
-    opts = dnnlib.EasyDict(kwargs) # Command line arguments.
-    c = dnnlib.EasyDict() # Main config dict.
+    opts = dnnlib.EasyDict(kwargs)  # Command line arguments.
+    c = dnnlib.EasyDict()  # Main config dict.
     c.G_kwargs = dnnlib.EasyDict(class_name=None, z_dim=512, w_dim=512, mapping_kwargs=dnnlib.EasyDict())
     c.D_kwargs = dnnlib.EasyDict(class_name='training.networks_stylegan2.Discriminator', block_kwargs=dnnlib.EasyDict(), mapping_kwargs=dnnlib.EasyDict(), epilogue_kwargs=dnnlib.EasyDict())
-    c.G_opt_kwargs = dnnlib.EasyDict(class_name='torch.optim.Adam', betas=[0,0.99], eps=1e-8)
-    c.D_opt_kwargs = dnnlib.EasyDict(class_name='torch.optim.Adam', betas=[0,0.99], eps=1e-8)
+    c.G_opt_kwargs = dnnlib.EasyDict(class_name='torch.optim.Adam', betas=[0, 0.99], eps=1e-8)
+    c.D_opt_kwargs = dnnlib.EasyDict(class_name='torch.optim.Adam', betas=[0, 0.99], eps=1e-8)
     c.loss_kwargs = dnnlib.EasyDict(class_name='training.loss.StyleGAN2Loss')
     c.data_loader_kwargs = dnnlib.EasyDict(pin_memory=True, prefetch_factor=2)
 
@@ -266,9 +264,9 @@ def main(**kwargs):
     c.ema_kimg = c.batch_size * 10 / 32
     c.G_kwargs.class_name = 'training.triplane.TriPlaneGenerator'
     c.D_kwargs.class_name = 'training.dual_discriminator.DualDiscriminator'
-    c.G_kwargs.fused_modconv_default = 'inference_only' # Speed up training by using regular convolutions instead of grouped convolutions.
-    c.loss_kwargs.filter_mode = 'antialiased' # Filter mode for raw images ['antialiased', 'none', float [0-1]]
-    c.D_kwargs.disc_c_noise = opts.disc_c_noise # Regularization for discriminator pose conditioning
+    c.G_kwargs.fused_modconv_default = 'inference_only'  # Speed up training by using regular convolutions instead of grouped convolutions.
+    c.loss_kwargs.filter_mode = 'antialiased'  # Filter mode for raw images ['antialiased', 'none', float [0-1]]
+    c.D_kwargs.disc_c_noise = opts.disc_c_noise  # Regularization for discriminator pose conditioning
 
     if c.training_set_kwargs.resolution == 512:
         sr_module = 'training.superresolution.SuperresolutionHybrid8XDC'
@@ -278,35 +276,35 @@ def main(**kwargs):
         sr_module = 'training.superresolution.SuperresolutionHybrid2X'
     else:
         assert False, f"Unsupported resolution {c.training_set_kwargs.resolution}; make a new superresolution module"
-    
+
     if opts.sr_module != None:
         sr_module = opts.sr_module
-    
+
     rendering_options = {
         'image_resolution': c.training_set_kwargs.resolution,
         'disparity_space_sampling': False,
         'clamp_mode': 'softplus',
         'superresolution_module': sr_module,
-        'c_gen_conditioning_zero': not opts.gen_pose_cond, # if true, fill generator pose conditioning label with dummy zero vector
+        'c_gen_conditioning_zero': not opts.gen_pose_cond,  # if true, fill generator pose conditioning label with dummy zero vector
         'gpc_reg_prob': opts.gpc_reg_prob if opts.gen_pose_cond else None,
-        'c_scale': opts.c_scale, # mutliplier for generator pose conditioning label
-        'superresolution_noise_mode': opts.sr_noise_mode, # [random or none], whether to inject pixel noise into super-resolution layers
-        'density_reg': opts.density_reg, # strength of density regularization
-        'density_reg_p_dist': opts.density_reg_p_dist, # distance at which to sample perturbed points for density regularization
-        'reg_type': opts.reg_type, # for experimenting with variations on density regularization
-        'decoder_lr_mul': opts.decoder_lr_mul, # learning rate multiplier for decoder
+        'c_scale': opts.c_scale,  # mutliplier for generator pose conditioning label
+        'superresolution_noise_mode': opts.sr_noise_mode,  # [random or none], whether to inject pixel noise into super-resolution layers
+        'density_reg': opts.density_reg,  # strength of density regularization
+        'density_reg_p_dist': opts.density_reg_p_dist,  # distance at which to sample perturbed points for density regularization
+        'reg_type': opts.reg_type,  # for experimenting with variations on density regularization
+        'decoder_lr_mul': opts.decoder_lr_mul,  # learning rate multiplier for decoder
         'sr_antialias': True,
     }
 
     if opts.cfg == 'ffhq':
         rendering_options.update({
-            'depth_resolution': 48, # number of uniform samples to take per ray.
-            'depth_resolution_importance': 48, # number of importance samples to take per ray.
-            'ray_start': 2.25, # near point along each ray to start taking samples.
-            'ray_end': 3.3, # far point along each ray to stop taking samples. 
-            'box_warp': 1, # the side-length of the bounding box spanned by the tri-planes; box_warp=1 means [-0.5, -0.5, -0.5] -> [0.5, 0.5, 0.5].
-            'avg_camera_radius': 2.7, # used only in the visualizer to specify camera orbit radius.
-            'avg_camera_pivot': [0, 0, 0.2], # used only in the visualizer to control center of camera rotation.
+            'depth_resolution': 48,  # number of uniform samples to take per ray.
+            'depth_resolution_importance': 48,  # number of importance samples to take per ray.
+            'ray_start': 2.25,  # near point along each ray to start taking samples.
+            'ray_end': 3.3,  # far point along each ray to stop taking samples.
+            'box_warp': 1,  # the side-length of the bounding box spanned by the tri-planes; box_warp=1 means [-0.5, -0.5, -0.5] -> [0.5, 0.5, 0.5].
+            'avg_camera_radius': 2.7,  # used only in the visualizer to specify camera orbit radius.
+            'avg_camera_pivot': [0, 0, 0.2],  # used only in the visualizer to control center of camera rotation.
         })
     elif opts.cfg == 'afhq':
         rendering_options.update({
@@ -342,14 +340,12 @@ def main(**kwargs):
     else:
         assert False, "Need to specify config"
 
-
-
     if opts.density_reg > 0:
         c.G_reg_interval = opts.density_reg_every
     c.G_kwargs.rendering_kwargs = rendering_options
     c.G_kwargs.num_fp16_res = 0
-    c.loss_kwargs.blur_init_sigma = 10 # Blur the images seen by the discriminator.
-    c.loss_kwargs.blur_fade_kimg = c.batch_size * opts.blur_fade_kimg / 32 # Fade out the blur during the first N kimg.
+    c.loss_kwargs.blur_init_sigma = 10  # Blur the images seen by the discriminator.
+    c.loss_kwargs.blur_fade_kimg = c.batch_size * opts.blur_fade_kimg / 32  # Fade out the blur during the first N kimg.
 
     c.loss_kwargs.gpc_reg_prob = opts.gpc_reg_prob if opts.gen_pose_cond else None
     c.loss_kwargs.gpc_reg_fade_kimg = opts.gpc_reg_fade_kimg
@@ -374,11 +370,11 @@ def main(**kwargs):
     # Resume.
     if opts.resume is not None:
         c.resume_pkl = opts.resume
-        c.ada_kimg = 100 # Make ADA react faster at the beginning.
-        c.ema_rampup = None # Disable EMA rampup.
+        c.ada_kimg = 100  # Make ADA react faster at the beginning.
+        c.ema_rampup = None  # Disable EMA rampup.
         if not opts.resume_blur:
-            c.loss_kwargs.blur_init_sigma = 0 # Disable blur rampup.
-            c.loss_kwargs.gpc_reg_fade_kimg = 0 # Disable swapping rampup
+            c.loss_kwargs.blur_init_sigma = 0  # Disable blur rampup.
+            c.loss_kwargs.gpc_reg_fade_kimg = 0  # Disable swapping rampup
 
     # Performance-related toggles.
     # if opts.fp32:
@@ -400,9 +396,10 @@ def main(**kwargs):
     # Launch.
     launch_training(c=c, desc=desc, outdir=opts.outdir, dry_run=opts.dry_run)
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    main() # pylint: disable=no-value-for-parameter
+    main()  # pylint: disable=no-value-for-parameter
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------

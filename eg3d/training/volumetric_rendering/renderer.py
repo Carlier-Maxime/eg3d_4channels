@@ -20,6 +20,7 @@ import torch.nn as nn
 from training.volumetric_rendering.ray_marcher import MipRayMarcher2
 from training.volumetric_rendering import math_utils
 
+
 def generate_planes():
     """
     Defines planes by the three vectors that form the "axes" of the
@@ -27,14 +28,15 @@ def generate_planes():
     arbitrary orientation.
     """
     return torch.tensor([[[1, 0, 0],
-                            [0, 1, 0],
-                            [0, 0, 1]],
-                            [[1, 0, 0],
-                            [0, 0, 1],
-                            [0, 1, 0]],
-                            [[0, 0, 1],
-                            [1, 0, 0],
-                            [0, 1, 0]]], dtype=torch.float32)
+                          [0, 1, 0],
+                          [0, 0, 1]],
+                         [[1, 0, 0],
+                          [0, 0, 1],
+                          [0, 1, 0]],
+                         [[0, 0, 1],
+                          [1, 0, 0],
+                          [0, 1, 0]]], dtype=torch.float32)
+
 
 def project_onto_planes(planes, coordinates):
     """
@@ -47,22 +49,24 @@ def project_onto_planes(planes, coordinates):
     """
     N, M, C = coordinates.shape
     n_planes, _, _ = planes.shape
-    coordinates = coordinates.unsqueeze(1).expand(-1, n_planes, -1, -1).reshape(N*n_planes, M, 3)
-    inv_planes = torch.linalg.inv(planes).unsqueeze(0).expand(N, -1, -1, -1).reshape(N*n_planes, 3, 3)
+    coordinates = coordinates.unsqueeze(1).expand(-1, n_planes, -1, -1).reshape(N * n_planes, M, 3)
+    inv_planes = torch.linalg.inv(planes).unsqueeze(0).expand(N, -1, -1, -1).reshape(N * n_planes, 3, 3)
     projections = torch.bmm(coordinates, inv_planes)
     return projections[..., :2]
+
 
 def sample_from_planes(plane_axes, plane_features, coordinates, mode='bilinear', padding_mode='zeros', box_warp=None):
     assert padding_mode == 'zeros'
     N, n_planes, C, H, W = plane_features.shape
     _, M, _ = coordinates.shape
-    plane_features = plane_features.view(N*n_planes, C, H, W)
+    plane_features = plane_features.view(N * n_planes, C, H, W)
 
-    coordinates = (2/box_warp) * coordinates # TODO: add specific box bounds
+    coordinates = (2 / box_warp) * coordinates  # TODO: add specific box bounds
 
     projected_coordinates = project_onto_planes(plane_axes, coordinates).unsqueeze(1)
     output_features = torch.nn.functional.grid_sample(plane_features, projected_coordinates.float(), mode=mode, padding_mode=padding_mode, align_corners=False).permute(0, 3, 2, 1).reshape(N, n_planes, M, C)
     return output_features
+
 
 def sample_from_3dgrid(grid, coordinates):
     """
@@ -76,8 +80,9 @@ def sample_from_3dgrid(grid, coordinates):
                                                        coordinates.reshape(batch_size, 1, 1, -1, n_dims),
                                                        mode='bilinear', padding_mode='zeros', align_corners=False)
     N, C, H, W, D = sampled_features.shape
-    sampled_features = sampled_features.permute(0, 4, 3, 2, 1).reshape(N, H*W*D, C)
+    sampled_features = sampled_features.permute(0, 4, 3, 2, 1).reshape(N, H * W * D, C)
     return sampled_features
+
 
 class ImportanceRenderer(torch.nn.Module):
     def __init__(self):
@@ -105,7 +110,6 @@ class ImportanceRenderer(torch.nn.Module):
         sample_coordinates = (ray_origins.unsqueeze(-2) + depths_coarse * ray_directions.unsqueeze(-2)).reshape(batch_size, -1, 3)
         sample_directions = ray_directions.unsqueeze(-2).expand(-1, -1, samples_per_ray, -1).reshape(batch_size, -1, 3)
 
-
         out = self.run_model(planes, decoder, sample_coordinates, sample_directions, rendering_options)
         colors_coarse = out['rgb']
         densities_coarse = out['sigma']
@@ -129,13 +133,12 @@ class ImportanceRenderer(torch.nn.Module):
             densities_fine = densities_fine.reshape(batch_size, num_rays, N_importance, 1)
 
             all_depths, all_colors, all_densities = self.unify_samples(depths_coarse, colors_coarse, densities_coarse,
-                                                                  depths_fine, colors_fine, densities_fine)
+                                                                       depths_fine, colors_fine, densities_fine)
 
             # Aggregate
             rgb_final, depth_final, weights = self.ray_marcher(all_colors, all_densities, all_depths, rendering_options)
         else:
             rgb_final, depth_final, weights = self.ray_marcher(colors_coarse, densities_coarse, depths_coarse, rendering_options)
-
 
         return rgb_final, depth_final, weights.sum(2)
 
@@ -155,9 +158,9 @@ class ImportanceRenderer(torch.nn.Module):
         return all_depths, all_colors, all_densities
 
     def unify_samples(self, depths1, colors1, densities1, depths2, colors2, densities2):
-        all_depths = torch.cat([depths1, depths2], dim = -2)
-        all_colors = torch.cat([colors1, colors2], dim = -2)
-        all_densities = torch.cat([densities1, densities2], dim = -2)
+        all_depths = torch.cat([depths1, depths2], dim=-2)
+        all_colors = torch.cat([colors1, colors2], dim=-2)
+        all_densities = torch.cat([densities1, densities2], dim=-2)
 
         _, indices = torch.sort(all_depths, dim=-2)
         all_depths = torch.gather(all_depths, -2, indices)
@@ -173,20 +176,20 @@ class ImportanceRenderer(torch.nn.Module):
         N, M, _ = ray_origins.shape
         if disparity_space_sampling:
             depths_coarse = torch.linspace(0,
-                                    1,
-                                    depth_resolution,
-                                    device=ray_origins.device).reshape(1, 1, depth_resolution, 1).repeat(N, M, 1, 1)
-            depth_delta = 1/(depth_resolution - 1)
+                                           1,
+                                           depth_resolution,
+                                           device=ray_origins.device).reshape(1, 1, depth_resolution, 1).repeat(N, M, 1, 1)
+            depth_delta = 1 / (depth_resolution - 1)
             depths_coarse += torch.rand_like(depths_coarse) * depth_delta
-            depths_coarse = 1./(1./ray_start * (1. - depths_coarse) + 1./ray_end * depths_coarse)
+            depths_coarse = 1. / (1. / ray_start * (1. - depths_coarse) + 1. / ray_end * depths_coarse)
         else:
             if type(ray_start) == torch.Tensor:
-                depths_coarse = math_utils.linspace(ray_start, ray_end, depth_resolution).permute(1,2,0,3)
+                depths_coarse = math_utils.linspace(ray_start, ray_end, depth_resolution).permute(1, 2, 0, 3)
                 depth_delta = (ray_end - ray_start) / (depth_resolution - 1)
                 depths_coarse += torch.rand_like(depths_coarse) * depth_delta[..., None]
             else:
                 depths_coarse = torch.linspace(ray_start, ray_end, depth_resolution, device=ray_origins.device).reshape(1, 1, depth_resolution, 1).repeat(N, M, 1, 1)
-                depth_delta = (ray_end - ray_start)/(depth_resolution - 1)
+                depth_delta = (ray_end - ray_start) / (depth_resolution - 1)
                 depths_coarse += torch.rand_like(depths_coarse) * depth_delta
 
         return depths_coarse
@@ -199,16 +202,16 @@ class ImportanceRenderer(torch.nn.Module):
             batch_size, num_rays, samples_per_ray, _ = z_vals.shape
 
             z_vals = z_vals.reshape(batch_size * num_rays, samples_per_ray)
-            weights = weights.reshape(batch_size * num_rays, -1) # -1 to account for loss of 1 sample in MipRayMarcher
+            weights = weights.reshape(batch_size * num_rays, -1)  # -1 to account for loss of 1 sample in MipRayMarcher
 
             # smooth weights
             weights = torch.nn.functional.max_pool1d(weights.unsqueeze(1).float(), 2, 1, padding=1)
             weights = torch.nn.functional.avg_pool1d(weights, 2, 1).squeeze()
             weights = weights + 0.01
 
-            z_vals_mid = 0.5 * (z_vals[: ,:-1] + z_vals[: ,1:])
+            z_vals_mid = 0.5 * (z_vals[:, :-1] + z_vals[:, 1:])
             importance_z_vals = self.sample_pdf(z_vals_mid, weights[:, 1:-1],
-                                             N_importance).detach().reshape(batch_size, num_rays, N_importance, 1)
+                                                N_importance).detach().reshape(batch_size, num_rays, N_importance, 1)
         return importance_z_vals
 
     def sample_pdf(self, bins, weights, N_importance, det=False, eps=1e-5):
@@ -224,11 +227,11 @@ class ImportanceRenderer(torch.nn.Module):
             samples: the sampled samples
         """
         N_rays, N_samples_ = weights.shape
-        weights = weights + eps # prevent division by zero (don't do inplace op!)
-        pdf = weights / torch.sum(weights, -1, keepdim=True) # (N_rays, N_samples_)
-        cdf = torch.cumsum(pdf, -1) # (N_rays, N_samples), cumulative distribution function
-        cdf = torch.cat([torch.zeros_like(cdf[: ,:1]), cdf], -1)  # (N_rays, N_samples_+1)
-                                                                   # padded to 0~1 inclusive
+        weights = weights + eps  # prevent division by zero (don't do inplace op!)
+        pdf = weights / torch.sum(weights, -1, keepdim=True)  # (N_rays, N_samples_)
+        cdf = torch.cumsum(pdf, -1)  # (N_rays, N_samples), cumulative distribution function
+        cdf = torch.cat([torch.zeros_like(cdf[:, :1]), cdf], -1)  # (N_rays, N_samples_+1)
+        # padded to 0~1 inclusive
 
         if det:
             u = torch.linspace(0, 1, N_importance, device=bins.device)
@@ -238,16 +241,16 @@ class ImportanceRenderer(torch.nn.Module):
         u = u.contiguous()
 
         inds = torch.searchsorted(cdf, u, right=True)
-        below = torch.clamp_min(inds-1, 0)
+        below = torch.clamp_min(inds - 1, 0)
         above = torch.clamp_max(inds, N_samples_)
 
-        inds_sampled = torch.stack([below, above], -1).view(N_rays, 2*N_importance)
+        inds_sampled = torch.stack([below, above], -1).view(N_rays, 2 * N_importance)
         cdf_g = torch.gather(cdf, 1, inds_sampled).view(N_rays, N_importance, 2)
         bins_g = torch.gather(bins, 1, inds_sampled).view(N_rays, N_importance, 2)
 
-        denom = cdf_g[...,1]-cdf_g[...,0]
-        denom[denom<eps] = 1 # denom equals 0 means a bin has weight 0, in which case it will not be sampled
-                             # anyway, therefore any value for it is fine (set to 1 here)
+        denom = cdf_g[..., 1] - cdf_g[..., 0]
+        denom[denom < eps] = 1  # denom equals 0 means a bin has weight 0, in which case it will not be sampled
+        # anyway, therefore any value for it is fine (set to 1 here)
 
-        samples = bins_g[...,0] + (u-cdf_g[...,0])/denom * (bins_g[...,1]-bins_g[...,0])
+        samples = bins_g[..., 0] + (u - cdf_g[..., 0]) / denom * (bins_g[..., 1] - bins_g[..., 0])
         return samples

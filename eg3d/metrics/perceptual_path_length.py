@@ -18,7 +18,8 @@ import numpy as np
 import torch
 from . import metric_utils
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 # Spherical interpolation of a batch of vectors.
 def slerp(a, b, t):
@@ -32,7 +33,8 @@ def slerp(a, b, t):
     d = d / d.norm(dim=-1, keepdim=True)
     return d
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 class PPLSampler(torch.nn.Module):
     def __init__(self, G, G_kwargs, epsilon, space, sampling, crop, vgg16):
@@ -54,13 +56,13 @@ class PPLSampler(torch.nn.Module):
 
         # Interpolate in W or Z.
         if self.space == 'w':
-            w0, w1 = self.G.mapping(z=torch.cat([z0,z1]), c=torch.cat([c,c])).chunk(2)
+            w0, w1 = self.G.mapping(z=torch.cat([z0, z1]), c=torch.cat([c, c])).chunk(2)
             wt0 = w0.lerp(w1, t.unsqueeze(1).unsqueeze(2))
             wt1 = w0.lerp(w1, t.unsqueeze(1).unsqueeze(2) + self.epsilon)
-        else: # space == 'z'
+        else:  # space == 'z'
             zt0 = slerp(z0, z1, t.unsqueeze(1))
             zt1 = slerp(z0, z1, t.unsqueeze(1) + self.epsilon)
-            wt0, wt1 = self.G.mapping(z=torch.cat([zt0,zt1]), c=torch.cat([c,c])).chunk(2)
+            wt0, wt1 = self.G.mapping(z=torch.cat([zt0, zt1]), c=torch.cat([c, c])).chunk(2)
 
         # Randomize noise buffers.
         for name, buf in self.G.named_buffers():
@@ -68,13 +70,13 @@ class PPLSampler(torch.nn.Module):
                 buf.copy_(torch.randn_like(buf))
 
         # Generate images.
-        img = self.G.synthesis(ws=torch.cat([wt0,wt1]), noise_mode='const', force_fp32=True, **self.G_kwargs)
+        img = self.G.synthesis(ws=torch.cat([wt0, wt1]), noise_mode='const', force_fp32=True, **self.G_kwargs)
 
         # Center crop.
         if self.crop:
             assert img.shape[2] == img.shape[3]
             c = img.shape[2] // 8
-            img = img[:, :, c*3 : c*7, c*2 : c*6]
+            img = img[:, :, c * 3: c * 7, c * 2: c * 6]
 
         # Downsample to 256x256.
         factor = self.G.img_resolution // 256
@@ -91,7 +93,8 @@ class PPLSampler(torch.nn.Module):
         dist = (lpips_t0 - lpips_t1).square().sum(1) / self.epsilon ** 2
         return dist
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def compute_ppl(opts, num_samples, epsilon, space, sampling, crop, batch_size):
     vgg16_url = 'https://api.ngc.nvidia.com/v2/models/nvidia/research/stylegan3/versions/1/files/metrics/vgg16.pkl'
@@ -124,4 +127,4 @@ def compute_ppl(opts, num_samples, epsilon, space, sampling, crop, batch_size):
     ppl = np.extract(np.logical_and(dist >= lo, dist <= hi), dist).mean()
     return float(ppl)
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------

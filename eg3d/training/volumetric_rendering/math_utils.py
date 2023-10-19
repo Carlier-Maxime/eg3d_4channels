@@ -22,6 +22,7 @@
 
 import torch
 
+
 def transform_vectors(matrix: torch.Tensor, vectors4: torch.Tensor) -> torch.Tensor:
     """
     Left-multiplies MxM @ NxM. Returns NxM.
@@ -35,6 +36,7 @@ def normalize_vecs(vectors: torch.Tensor) -> torch.Tensor:
     Normalize vector lengths.
     """
     return vectors / (torch.norm(vectors, dim=-1, keepdim=True))
+
 
 def torch_dot(x: torch.Tensor, y: torch.Tensor):
     """
@@ -55,9 +57,8 @@ def get_ray_limits_box(rays_o: torch.Tensor, rays_d: torch.Tensor, box_side_leng
     rays_o = rays_o.detach().reshape(-1, 3)
     rays_d = rays_d.detach().reshape(-1, 3)
 
-
-    bb_min = [-1*(box_side_length/2), -1*(box_side_length/2), -1*(box_side_length/2)]
-    bb_max = [1*(box_side_length/2), 1*(box_side_length/2), 1*(box_side_length/2)]
+    bb_min = [-1 * (box_side_length / 2), -1 * (box_side_length / 2), -1 * (box_side_length / 2)]
+    bb_max = [1 * (box_side_length / 2), 1 * (box_side_length / 2), 1 * (box_side_length / 2)]
     bounds = torch.tensor([bb_min, bb_max], dtype=rays_o.dtype, device=rays_o.device)
     is_valid = torch.ones(rays_o.shape[:-1], dtype=bool, device=rays_o.device)
 

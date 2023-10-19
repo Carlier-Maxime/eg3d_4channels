@@ -18,9 +18,10 @@ from .. import misc
 from . import upfirdn2d
 from . import bias_act
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 
 _plugin = None
+
 
 def _init():
     global _plugin
@@ -34,12 +35,14 @@ def _init():
         )
     return True
 
+
 def _get_filter_size(f):
     if f is None:
         return 1, 1
     assert isinstance(f, torch.Tensor)
     assert 1 <= f.ndim <= 2
-    return f.shape[-1], f.shape[0] # width, height
+    return f.shape[-1], f.shape[0]  # width, height
+
 
 def _parse_padding(padding):
     if isinstance(padding, int):
@@ -53,7 +56,8 @@ def _parse_padding(padding):
     px0, px1, py0, py1 = padding
     return px0, px1, py0, py1
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def filtered_lrelu(x, fu=None, fd=None, b=None, up=1, down=1, padding=0, gain=np.sqrt(2), slope=0.2, clamp=None, flip_filter=False, impl='cuda'):
     r"""Filtered leaky ReLU for a batch of 2D images.
@@ -117,7 +121,8 @@ def filtered_lrelu(x, fu=None, fd=None, b=None, up=1, down=1, padding=0, gain=np
         return _filtered_lrelu_cuda(up=up, down=down, padding=padding, gain=gain, slope=slope, clamp=clamp, flip_filter=flip_filter).apply(x, fu, fd, b, None, 0, 0)
     return _filtered_lrelu_ref(x, fu=fu, fd=fd, b=b, up=up, down=down, padding=padding, gain=gain, slope=slope, clamp=clamp, flip_filter=flip_filter)
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 @misc.profiled_function
 def _filtered_lrelu_ref(x, fu=None, fd=None, b=None, up=1, down=1, padding=0, gain=np.sqrt(2), slope=0.2, clamp=None, flip_filter=False):
@@ -144,19 +149,21 @@ def _filtered_lrelu_ref(x, fu=None, fd=None, b=None, up=1, down=1, padding=0, ga
     out_h = (in_h * up + (py0 + py1) - (fu_h - 1) - (fd_h - 1) + (down - 1)) // down
 
     # Compute using existing ops.
-    x = bias_act.bias_act(x=x, b=b) # Apply bias.
-    x = upfirdn2d.upfirdn2d(x=x, f=fu, up=up, padding=[px0, px1, py0, py1], gain=up**2, flip_filter=flip_filter) # Upsample.
-    x = bias_act.bias_act(x=x, act='lrelu', alpha=slope, gain=gain, clamp=clamp) # Bias, leaky ReLU, clamp.
-    x = upfirdn2d.upfirdn2d(x=x, f=fd, down=down, flip_filter=flip_filter) # Downsample.
+    x = bias_act.bias_act(x=x, b=b)  # Apply bias.
+    x = upfirdn2d.upfirdn2d(x=x, f=fu, up=up, padding=[px0, px1, py0, py1], gain=up ** 2, flip_filter=flip_filter)  # Upsample.
+    x = bias_act.bias_act(x=x, act='lrelu', alpha=slope, gain=gain, clamp=clamp)  # Bias, leaky ReLU, clamp.
+    x = upfirdn2d.upfirdn2d(x=x, f=fd, down=down, flip_filter=flip_filter)  # Downsample.
 
     # Check output shape & dtype.
     misc.assert_shape(x, [batch_size, channels, out_h, out_w])
     assert x.dtype == in_dtype
     return x
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 _filtered_lrelu_cuda_cache = dict()
+
 
 def _filtered_lrelu_cuda(up=1, down=1, padding=0, gain=np.sqrt(2), slope=0.2, clamp=None, flip_filter=False):
     """Fast CUDA implementation of `filtered_lrelu()` using custom ops.
@@ -179,7 +186,7 @@ def _filtered_lrelu_cuda(up=1, down=1, padding=0, gain=np.sqrt(2), slope=0.2, cl
     # Forward op.
     class FilteredLReluCuda(torch.autograd.Function):
         @staticmethod
-        def forward(ctx, x, fu, fd, b, si, sx, sy): # pylint: disable=arguments-differ
+        def forward(ctx, x, fu, fd, b, si, sx, sy):  # pylint: disable=arguments-differ
             assert isinstance(x, torch.Tensor) and x.ndim == 4
 
             # Replace empty up/downsample kernels with full 1x1 kernels (faster than separable).
@@ -225,10 +232,10 @@ def _filtered_lrelu_cuda(up=1, down=1, padding=0, gain=np.sqrt(2), slope=0.2, cl
             if return_code < 0:
                 warnings.warn("filtered_lrelu called with parameters that have no optimized CUDA kernel, using generic fallback", RuntimeWarning)
 
-                y = x.add(b.unsqueeze(-1).unsqueeze(-1)) # Add bias.
-                y = upfirdn2d.upfirdn2d(x=y, f=fu, up=up, padding=[px0, px1, py0, py1], gain=up**2, flip_filter=flip_filter) # Upsample.
-                so = _plugin.filtered_lrelu_act_(y, si, sx, sy, gain, slope, clamp, write_signs) # Activation function and sign handling. Modifies y in-place.
-                y = upfirdn2d.upfirdn2d(x=y, f=fd, down=down, flip_filter=flip_filter) # Downsample.
+                y = x.add(b.unsqueeze(-1).unsqueeze(-1))  # Add bias.
+                y = upfirdn2d.upfirdn2d(x=y, f=fu, up=up, padding=[px0, px1, py0, py1], gain=up ** 2, flip_filter=flip_filter)  # Upsample.
+                so = _plugin.filtered_lrelu_act_(y, si, sx, sy, gain, slope, clamp, write_signs)  # Activation function and sign handling. Modifies y in-place.
+                y = upfirdn2d.upfirdn2d(x=y, f=fd, down=down, flip_filter=flip_filter)  # Downsample.
 
             # Prepare for gradient computation.
             ctx.save_for_backward(fu, fd, (si if si.numel() else so))
@@ -238,18 +245,23 @@ def _filtered_lrelu_cuda(up=1, down=1, padding=0, gain=np.sqrt(2), slope=0.2, cl
             return y
 
         @staticmethod
-        def backward(ctx, dy): # pylint: disable=arguments-differ
+        def backward(ctx, dy):  # pylint: disable=arguments-differ
             fu, fd, si = ctx.saved_tensors
             _, _, xh, xw = ctx.x_shape
             _, _, yh, yw = ctx.y_shape
             sx, sy = ctx.s_ofs
-            dx  = None # 0
-            dfu = None; assert not ctx.needs_input_grad[1]
-            dfd = None; assert not ctx.needs_input_grad[2]
-            db  = None # 3
-            dsi = None; assert not ctx.needs_input_grad[4]
-            dsx = None; assert not ctx.needs_input_grad[5]
-            dsy = None; assert not ctx.needs_input_grad[6]
+            dx = None  # 0
+            dfu = None;
+            assert not ctx.needs_input_grad[1]
+            dfd = None;
+            assert not ctx.needs_input_grad[2]
+            db = None  # 3
+            dsi = None;
+            assert not ctx.needs_input_grad[4]
+            dsx = None;
+            assert not ctx.needs_input_grad[5]
+            dsy = None;
+            assert not ctx.needs_input_grad[6]
 
             if ctx.needs_input_grad[0] or ctx.needs_input_grad[3]:
                 pp = [
@@ -261,7 +273,7 @@ def _filtered_lrelu_cuda(up=1, down=1, padding=0, gain=np.sqrt(2), slope=0.2, cl
                 gg = gain * (up ** 2) / (down ** 2)
                 ff = (not flip_filter)
                 sx = sx - (fu.shape[-1] - 1) + px0
-                sy = sy - (fu.shape[0]  - 1) + py0
+                sy = sy - (fu.shape[0] - 1) + py0
                 dx = _filtered_lrelu_cuda(up=down, down=up, padding=pp, gain=gg, slope=slope, clamp=None, flip_filter=ff).apply(dy, fd, fu, None, si, sx, sy)
 
             if ctx.needs_input_grad[3]:
@@ -273,4 +285,4 @@ def _filtered_lrelu_cuda(up=1, down=1, padding=0, gain=np.sqrt(2), slope=0.2, cl
     _filtered_lrelu_cuda_cache[key] = FilteredLReluCuda
     return FilteredLReluCuda
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------

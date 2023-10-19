@@ -22,14 +22,13 @@ import torch
 from tqdm import tqdm
 import mrcfile
 
-
 import legacy
 from camera_utils import LookAtPoseSampler, FOV_to_intrinsics
 from torch_utils import misc
 from training.triplane import TriPlaneGenerator
 
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 
 def parse_range(s: Union[str, List]) -> List[int]:
     '''Parse a comma separated list of numbers or ranges and return a list of ints.
@@ -41,12 +40,13 @@ def parse_range(s: Union[str, List]) -> List[int]:
     range_re = re.compile(r'^(\d+)-(\d+)$')
     for p in s.split(','):
         if m := range_re.match(p):
-            ranges.extend(range(int(m.group(1)), int(m.group(2))+1))
+            ranges.extend(range(int(m.group(1)), int(m.group(2)) + 1))
         else:
             ranges.append(int(p))
     return ranges
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def parse_vec2(s: Union[str, Tuple[float, float]]) -> Tuple[float, float]:
     '''Parse a floating point 2-vector of syntax 'a,b'.
@@ -60,12 +60,13 @@ def parse_vec2(s: Union[str, Tuple[float, float]]) -> Tuple[float, float]:
         return (float(parts[0]), float(parts[1]))
     raise ValueError(f'cannot parse 2-vector {s}')
 
-#----------------------------------------------------------------------------
 
-def make_transform(translate: Tuple[float,float], angle: float):
+# ----------------------------------------------------------------------------
+
+def make_transform(translate: Tuple[float, float], angle: float):
     m = np.eye(3)
-    s = np.sin(angle/360.0*np.pi*2)
-    c = np.cos(angle/360.0*np.pi*2)
+    s = np.sin(angle / 360.0 * np.pi * 2)
+    c = np.cos(angle / 360.0 * np.pi * 2)
     m[0][0] = c
     m[0][1] = s
     m[0][2] = translate[0]
@@ -74,11 +75,12 @@ def make_transform(translate: Tuple[float,float], angle: float):
     m[1][2] = translate[1]
     return m
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def create_samples(N=256, voxel_origin=[0, 0, 0], cube_length=2.0):
     # NOTE: the voxel_origin is actually the (bottom, left, down) corner, not the middle
-    voxel_origin = np.array(voxel_origin) - cube_length/2
+    voxel_origin = np.array(voxel_origin) - cube_length / 2
     voxel_size = cube_length / (N - 1)
 
     overall_index = torch.arange(0, N ** 3, 1, out=torch.LongTensor())
@@ -100,7 +102,8 @@ def create_samples(N=256, voxel_origin=[0, 0, 0], cube_length=2.0):
 
     return samples.unsqueeze(0), voxel_origin, voxel_size
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 @click.command()
 @click.option('--network', 'network_pkl', help='Network pickle filename', required=True)
@@ -115,17 +118,17 @@ def create_samples(N=256, voxel_origin=[0, 0, 0], cube_length=2.0):
 @click.option('--shape-format', help='Shape Format', type=click.Choice(['.mrc', '.ply']), default='.mrc')
 @click.option('--reload_modules', help='Overload persistent modules?', type=bool, required=False, metavar='BOOL', default=False, show_default=True)
 def generate_images(
-    network_pkl: str,
-    seeds: List[int],
-    truncation_psi: float,
-    truncation_cutoff: int,
-    outdir: str,
-    shapes: bool,
-    shape_res: int,
-    fov_deg: float,
-    shape_format: str,
-    class_idx: Optional[int],
-    reload_modules: bool,
+        network_pkl: str,
+        seeds: List[int],
+        truncation_psi: float,
+        truncation_cutoff: int,
+        outdir: str,
+        shapes: bool,
+        shape_res: int,
+        fov_deg: float,
+        shape_format: str,
+        class_idx: Optional[int],
+        reload_modules: bool,
 ):
     """Generate images using pretrained network pickle.
 
@@ -140,7 +143,7 @@ def generate_images(
     print('Loading networks from "%s"...' % network_pkl)
     device = torch.device('cuda')
     with dnnlib.util.open_url(network_pkl) as f:
-        G = legacy.load_network_pkl(f)['G_ema'].to(device) # type: ignore
+        G = legacy.load_network_pkl(f)['G_ema'].to(device)  # type: ignore
 
     # Specify reload_modules=True if you want code modifications to take effect; otherwise uses pickled code
     if reload_modules:
@@ -153,7 +156,7 @@ def generate_images(
 
     os.makedirs(outdir, exist_ok=True)
 
-    cam2world_pose = LookAtPoseSampler.sample(3.14/2, 3.14/2, torch.tensor([0, 0, 0.2], device=device), radius=2.7, device=device)
+    cam2world_pose = LookAtPoseSampler.sample(3.14 / 2, 3.14 / 2, torch.tensor([0, 0, 0.2], device=device), radius=2.7, device=device)
     intrinsics = FOV_to_intrinsics(fov_deg, device=device)
 
     # Generate images.
@@ -166,8 +169,8 @@ def generate_images(
         for angle_y, angle_p in [(.4, angle_p), (0, angle_p), (-.4, angle_p)]:
             cam_pivot = torch.tensor(G.rendering_kwargs.get('avg_camera_pivot', [0, 0, 0]), device=device)
             cam_radius = G.rendering_kwargs.get('avg_camera_radius', 2.7)
-            cam2world_pose = LookAtPoseSampler.sample(np.pi/2 + angle_y, np.pi/2 + angle_p, cam_pivot, radius=cam_radius, device=device)
-            conditioning_cam2world_pose = LookAtPoseSampler.sample(np.pi/2, np.pi/2, cam_pivot, radius=cam_radius, device=device)
+            cam2world_pose = LookAtPoseSampler.sample(np.pi / 2 + angle_y, np.pi / 2 + angle_p, cam_pivot, radius=cam_radius, device=device)
+            conditioning_cam2world_pose = LookAtPoseSampler.sample(np.pi / 2, np.pi / 2, cam_pivot, radius=cam_radius, device=device)
             camera_params = torch.cat([cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
             conditioning_params = torch.cat([conditioning_cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
 
@@ -183,21 +186,21 @@ def generate_images(
 
         if shapes:
             # extract a shape.mrc with marching cubes. You can view the .mrc file using ChimeraX from UCSF.
-            max_batch=1000000
+            max_batch = 1000000
 
-            samples, voxel_origin, voxel_size = create_samples(N=shape_res, voxel_origin=[0, 0, 0], cube_length=G.rendering_kwargs['box_warp'] * 1)#.reshape(1, -1, 3)
+            samples, voxel_origin, voxel_size = create_samples(N=shape_res, voxel_origin=[0, 0, 0], cube_length=G.rendering_kwargs['box_warp'] * 1)  # .reshape(1, -1, 3)
             samples = samples.to(z.device)
             sigmas = torch.zeros((samples.shape[0], samples.shape[1], 1), device=z.device)
             transformed_ray_directions_expanded = torch.zeros((samples.shape[0], max_batch, 3), device=z.device)
             transformed_ray_directions_expanded[..., -1] = -1
 
             head = 0
-            with tqdm(total = samples.shape[1]) as pbar:
+            with tqdm(total=samples.shape[1]) as pbar:
                 with torch.no_grad():
                     while head < samples.shape[1]:
                         torch.manual_seed(0)
-                        sigma = G.sample(samples[:, head:head+max_batch], transformed_ray_directions_expanded[:, :samples.shape[1]-head], z, conditioning_params, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff, noise_mode='const')['sigma']
-                        sigmas[:, head:head+max_batch] = sigma
+                        sigma = G.sample(samples[:, head:head + max_batch], transformed_ray_directions_expanded[:, :samples.shape[1] - head], z, conditioning_params, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff, noise_mode='const')['sigma']
+                        sigmas[:, head:head + max_batch] = sigma
                         head += max_batch
                         pbar.update(max_batch)
 
@@ -217,14 +220,14 @@ def generate_images(
             if shape_format == '.ply':
                 from shape_utils import convert_sdf_samples_to_ply
                 convert_sdf_samples_to_ply(np.transpose(sigmas, (2, 1, 0)), [0, 0, 0], 1, os.path.join(outdir, f'seed{seed:04d}.ply'), level=10)
-            elif shape_format == '.mrc': # output mrc
+            elif shape_format == '.mrc':  # output mrc
                 with mrcfile.new_mmap(os.path.join(outdir, f'seed{seed:04d}.mrc'), overwrite=True, shape=sigmas.shape, mrc_mode=2) as mrc:
                     mrc.data[:] = sigmas
 
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    generate_images() # pylint: disable=no-value-for-parameter
+    generate_images()  # pylint: disable=no-value-for-parameter
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------

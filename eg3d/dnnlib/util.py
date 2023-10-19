@@ -81,7 +81,7 @@ class Logger(object):
         """Write text to stdout (and a file) and optionally flush."""
         if isinstance(text, bytes):
             text = text.decode()
-        if len(text) == 0: # workaround for a bug in VSCode debugger: sys.stdout.write(''); sys.stdout.flush() => crash
+        if len(text) == 0:  # workaround for a bug in VSCode debugger: sys.stdout.write(''); sys.stdout.flush() => crash
             return
 
         if self.file is not None:
@@ -119,9 +119,11 @@ class Logger(object):
 
 _dnnlib_cache_dir = None
 
+
 def set_cache_dir(path: str) -> None:
     global _dnnlib_cache_dir
     _dnnlib_cache_dir = path
+
 
 def make_cache_dir_path(*paths: str) -> str:
     if _dnnlib_cache_dir is not None:
@@ -133,6 +135,7 @@ def make_cache_dir_path(*paths: str) -> str:
     if 'USERPROFILE' in os.environ:
         return os.path.join(os.environ['USERPROFILE'], '.cache', 'dnnlib', *paths)
     return os.path.join(tempfile.gettempdir(), '.cache', 'dnnlib', *paths)
+
 
 # Small util functions
 # ------------------------------------------------------------------------------------------
@@ -250,8 +253,8 @@ def get_module_from_obj_name(obj_name: str) -> Tuple[types.ModuleType, str]:
     # try each alternative in turn
     for module_name, local_obj_name in name_pairs:
         try:
-            module = importlib.import_module(module_name) # may raise ImportError
-            get_obj_from_module(module, local_obj_name) # may raise AttributeError
+            module = importlib.import_module(module_name)  # may raise ImportError
+            get_obj_from_module(module, local_obj_name)  # may raise AttributeError
             return module, local_obj_name
         except:
             pass
@@ -259,7 +262,7 @@ def get_module_from_obj_name(obj_name: str) -> Tuple[types.ModuleType, str]:
     # maybe some of the modules themselves contain errors?
     for module_name, _local_obj_name in name_pairs:
         try:
-            importlib.import_module(module_name) # may raise ImportError
+            importlib.import_module(module_name)  # may raise ImportError
         except ImportError:
             if not str(sys.exc_info()[1]).startswith("No module named '" + module_name + "'"):
                 raise
@@ -267,8 +270,8 @@ def get_module_from_obj_name(obj_name: str) -> Tuple[types.ModuleType, str]:
     # maybe the requested attribute is missing?
     for module_name, local_obj_name in name_pairs:
         try:
-            module = importlib.import_module(module_name) # may raise ImportError
-            get_obj_from_module(module, local_obj_name) # may raise AttributeError
+            module = importlib.import_module(module_name)  # may raise ImportError
+            get_obj_from_module(module, local_obj_name)  # may raise AttributeError
         except ImportError:
             pass
 
@@ -484,7 +487,7 @@ def open_url(url: str, cache_dir: str = None, num_attempts: int = 10, verbose: b
         os.makedirs(cache_dir, exist_ok=True)
         with open(temp_file, "wb") as f:
             f.write(url_data)
-        os.replace(temp_file, cache_file) # atomic
+        os.replace(temp_file, cache_file)  # atomic
         if return_filename:
             return cache_file
 

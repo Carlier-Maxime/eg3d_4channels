@@ -11,15 +11,16 @@
 import imgui
 from gui_utils import imgui_utils
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 class RenderDepthSampleWidget:
     def __init__(self, viz):
-        self.viz        = viz
-        self.depth_mult            = 2
+        self.viz = viz
+        self.depth_mult = 2
         self.depth_importance_mult = 2
         self.render_types = [.5, 1, 2, 4]
-        self.labels       = ['0.5x', '1x', '2x', '4x']
+        self.labels = ['0.5x', '1x', '2x', '4x']
 
     @imgui_utils.scoped_by_object_id
     def __call__(self, show=True):
@@ -37,4 +38,4 @@ class RenderDepthSampleWidget:
         viz.args.depth_mult = self.render_types[self.depth_mult]
         viz.args.depth_importance_mult = self.render_types[self.depth_importance_mult]
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------

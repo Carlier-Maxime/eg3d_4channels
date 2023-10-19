@@ -16,7 +16,8 @@ https://github.com/kynkaat/improved-precision-and-recall-metric/blob/master/prec
 import torch
 from . import metric_utils
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def compute_distances(row_features, col_features, num_gpus, rank, col_batch_size):
     assert 0 <= rank < num_gpus
@@ -24,7 +25,7 @@ def compute_distances(row_features, col_features, num_gpus, rank, col_batch_size
     num_batches = ((num_cols - 1) // col_batch_size // num_gpus + 1) * num_gpus
     col_batches = torch.nn.functional.pad(col_features, [0, 0, 0, -num_cols % num_batches]).chunk(num_batches)
     dist_batches = []
-    for col_batch in col_batches[rank :: num_gpus]:
+    for col_batch in col_batches[rank:: num_gpus]:
         dist_batch = torch.cdist(row_features.unsqueeze(0), col_batch.unsqueeze(0))[0]
         for src in range(num_gpus):
             dist_broadcast = dist_batch.clone()
@@ -33,7 +34,8 @@ def compute_distances(row_features, col_features, num_gpus, rank, col_batch_size
             dist_batches.append(dist_broadcast.cpu() if rank == 0 else None)
     return torch.cat(dist_batches, dim=1)[:, :num_cols] if rank == 0 else None
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def compute_pr(opts, max_real, num_gen, nhood_size, row_batch_size, col_batch_size):
     detector_url = 'https://api.ngc.nvidia.com/v2/models/nvidia/research/stylegan3/versions/1/files/metrics/vgg16.pkl'
@@ -61,4 +63,4 @@ def compute_pr(opts, max_real, num_gen, nhood_size, row_batch_size, col_batch_si
         results[name] = float(torch.cat(pred).to(torch.float32).mean() if opts.rank == 0 else 'nan')
     return results['precision'], results['recall']
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------

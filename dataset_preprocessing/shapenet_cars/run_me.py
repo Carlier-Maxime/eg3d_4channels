@@ -14,7 +14,6 @@ import shutil
 import tempfile
 import subprocess
 
-
 if __name__ == '__main__':
     with tempfile.TemporaryDirectory() as working_dir:
         download_name = 'cars_train.zip'

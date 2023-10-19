@@ -27,7 +27,9 @@ import legacy
 
 from camera_utils import LookAtPoseSampler
 from torch_utils import misc
-#----------------------------------------------------------------------------
+
+
+# ----------------------------------------------------------------------------
 
 def layout_grid(img, grid_w=None, grid_h=1, float_to_uint8=True, chw_to_hwc=True, to_numpy=True):
     batch_size, channels, img_h, img_w = img.shape
@@ -45,9 +47,10 @@ def layout_grid(img, grid_w=None, grid_h=1, float_to_uint8=True, chw_to_hwc=True
         img = img.cpu().numpy()
     return img
 
+
 def create_samples(N=256, voxel_origin=[0, 0, 0], cube_length=2.0):
     # NOTE: the voxel_origin is actually the (bottom, left, down) corner, not the middle
-    voxel_origin = np.array(voxel_origin) - cube_length/2
+    voxel_origin = np.array(voxel_origin) - cube_length / 2
     voxel_size = cube_length / (N - 1)
 
     overall_index = torch.arange(0, N ** 3, 1, out=torch.LongTensor())
@@ -69,19 +72,20 @@ def create_samples(N=256, voxel_origin=[0, 0, 0], cube_length=2.0):
 
     return samples.unsqueeze(0), voxel_origin, voxel_size
 
-#----------------------------------------------------------------------------
 
-def gen_interp_video(G, mp4: str, seeds, shuffle_seed=None, w_frames=60*4, kind='cubic', grid_dims=(1,1), num_keyframes=None, wraps=2, psi=1, truncation_cutoff=14, cfg='FFHQ', image_mode='image', gen_shapes=False, device=torch.device('cuda'), **video_kwargs):
+# ----------------------------------------------------------------------------
+
+def gen_interp_video(G, mp4: str, seeds, shuffle_seed=None, w_frames=60 * 4, kind='cubic', grid_dims=(1, 1), num_keyframes=None, wraps=2, psi=1, truncation_cutoff=14, cfg='FFHQ', image_mode='image', gen_shapes=False, device=torch.device('cuda'), **video_kwargs):
     grid_w = grid_dims[0]
     grid_h = grid_dims[1]
 
     if num_keyframes is None:
-        if len(seeds) % (grid_w*grid_h) != 0:
+        if len(seeds) % (grid_w * grid_h) != 0:
             raise ValueError('Number of input seeds must be divisible by grid W*H')
-        num_keyframes = len(seeds) // (grid_w*grid_h)
+        num_keyframes = len(seeds) // (grid_w * grid_h)
 
-    all_seeds = np.zeros(num_keyframes*grid_h*grid_w, dtype=np.int64)
-    for idx in range(num_keyframes*grid_h*grid_w):
+    all_seeds = np.zeros(num_keyframes * grid_h * grid_w, dtype=np.int64)
+    for idx in range(num_keyframes * grid_h * grid_w):
         all_seeds[idx] = seeds[idx % len(seeds)]
 
     if shuffle_seed is not None:
@@ -90,13 +94,13 @@ def gen_interp_video(G, mp4: str, seeds, shuffle_seed=None, w_frames=60*4, kind=
 
     camera_lookat_point = torch.tensor(G.rendering_kwargs['avg_camera_pivot'], device=device)
     zs = torch.from_numpy(np.stack([np.random.RandomState(seed).randn(G.z_dim) for seed in all_seeds])).to(device)
-    cam2world_pose = LookAtPoseSampler.sample(3.14/2, 3.14/2, camera_lookat_point, radius=G.rendering_kwargs['avg_camera_radius'], device=device)
-    focal_length = 4.2647 if cfg != 'Shapenet' else 1.7074 # shapenet has higher FOV
+    cam2world_pose = LookAtPoseSampler.sample(3.14 / 2, 3.14 / 2, camera_lookat_point, radius=G.rendering_kwargs['avg_camera_radius'], device=device)
+    focal_length = 4.2647 if cfg != 'Shapenet' else 1.7074  # shapenet has higher FOV
     intrinsics = torch.tensor([[focal_length, 0, 0.5], [0, focal_length, 0.5], [0, 0, 1]], device=device)
     c = torch.cat([cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
     c = c.repeat(len(zs), 1)
     ws = G.mapping(z=zs, c=c, truncation_psi=psi, truncation_cutoff=truncation_cutoff)
-    _ = G.synthesis(ws[:1], c[:1]) # warm up
+    _ = G.synthesis(ws[:1], c[:1])  # warm up
     ws = ws.reshape(grid_h, grid_w, num_keyframes, *ws.shape[1:])
 
     # Interpolation.
@@ -125,11 +129,11 @@ def gen_interp_video(G, mp4: str, seeds, shuffle_seed=None, w_frames=60*4, kind=
             for xi in range(grid_w):
                 pitch_range = 0.25
                 yaw_range = 0.35
-                cam2world_pose = LookAtPoseSampler.sample(3.14/2 + yaw_range * np.sin(2 * 3.14 * frame_idx / (num_keyframes * w_frames)),
-                                                        3.14/2 -0.05 + pitch_range * np.cos(2 * 3.14 * frame_idx / (num_keyframes * w_frames)),
-                                                        camera_lookat_point, radius=G.rendering_kwargs['avg_camera_radius'], device=device)
+                cam2world_pose = LookAtPoseSampler.sample(3.14 / 2 + yaw_range * np.sin(2 * 3.14 * frame_idx / (num_keyframes * w_frames)),
+                                                          3.14 / 2 - 0.05 + pitch_range * np.cos(2 * 3.14 * frame_idx / (num_keyframes * w_frames)),
+                                                          camera_lookat_point, radius=G.rendering_kwargs['avg_camera_radius'], device=device)
                 all_poses.append(cam2world_pose.squeeze().cpu().numpy())
-                focal_length = 4.2647 if cfg != 'Shapenet' else 1.7074 # shapenet has higher FOV
+                focal_length = 4.2647 if cfg != 'Shapenet' else 1.7074  # shapenet has higher FOV
                 intrinsics = torch.tensor([[focal_length, 0, 0.5], [0, focal_length, 0.5], [0, 0, 1]], device=device)
                 c = torch.cat([cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
 
@@ -138,8 +142,8 @@ def gen_interp_video(G, mp4: str, seeds, shuffle_seed=None, w_frames=60*4, kind=
 
                 entangle = 'camera'
                 if entangle == 'conditioning':
-                    c_forward = torch.cat([LookAtPoseSampler.sample(3.14/2,
-                                                                    3.14/2,
+                    c_forward = torch.cat([LookAtPoseSampler.sample(3.14 / 2,
+                                                                    3.14 / 2,
                                                                     camera_lookat_point,
                                                                     radius=G.rendering_kwargs['avg_camera_radius'], device=device).reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
                     w_c = G.mapping(z=zs[0:1], c=c[0:1], truncation_psi=psi, truncation_cutoff=truncation_cutoff)
@@ -167,12 +171,12 @@ def gen_interp_video(G, mp4: str, seeds, shuffle_seed=None, w_frames=60*4, kind=
                     transformed_ray_directions_expanded[..., -1] = -1
 
                     head = 0
-                    with tqdm(total = samples.shape[1]) as pbar:
+                    with tqdm(total=samples.shape[1]) as pbar:
                         with torch.no_grad():
                             while head < samples.shape[1]:
                                 torch.manual_seed(0)
-                                sigma = G.sample_mixed(samples[:, head:head+max_batch], transformed_ray_directions_expanded[:, :samples.shape[1]-head], w.unsqueeze(0), truncation_psi=psi, noise_mode='const')['sigma']
-                                sigmas[:, head:head+max_batch] = sigma
+                                sigma = G.sample_mixed(samples[:, head:head + max_batch], transformed_ray_directions_expanded[:, :samples.shape[1] - head], w.unsqueeze(0), truncation_psi=psi, noise_mode='const')['sigma']
+                                sigmas[:, head:head + max_batch] = sigma
                                 head += max_batch
                                 pbar.update(max_batch)
 
@@ -192,7 +196,7 @@ def gen_interp_video(G, mp4: str, seeds, shuffle_seed=None, w_frames=60*4, kind=
                     if output_ply:
                         from shape_utils import convert_sdf_samples_to_ply
                         convert_sdf_samples_to_ply(np.transpose(sigmas, (2, 1, 0)), [0, 0, 0], 1, os.path.join(outdir, f'{frame_idx:04d}_shape.ply'), level=10)
-                    else: # output mrc
+                    else:  # output mrc
                         with mrcfile.new_mmap(outdir + f'{frame_idx:04d}_shape.mrc', overwrite=True, shape=sigmas.shape, mrc_mode=2) as mrc:
                             mrc.data[:] = sigmas
 
@@ -205,7 +209,8 @@ def gen_interp_video(G, mp4: str, seeds, shuffle_seed=None, w_frames=60*4, kind=
         with open(mp4.replace('.mp4', '_trajectory.npy'), 'wb') as f:
             np.save(f, all_poses)
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def parse_range(s: Union[str, List[int]]) -> List[int]:
     '''Parse a comma separated list of numbers or ranges and return a list of ints.
@@ -217,14 +222,15 @@ def parse_range(s: Union[str, List[int]]) -> List[int]:
     range_re = re.compile(r'^(\d+)-(\d+)$')
     for p in s.split(','):
         if m := range_re.match(p):
-            ranges.extend(range(int(m.group(1)), int(m.group(2))+1))
+            ranges.extend(range(int(m.group(1)), int(m.group(2)) + 1))
         else:
             ranges.append(int(p))
     return ranges
 
-#----------------------------------------------------------------------------
 
-def parse_tuple(s: Union[str, Tuple[int,int]]) -> Tuple[int, int]:
+# ----------------------------------------------------------------------------
+
+def parse_tuple(s: Union[str, Tuple[int, int]]) -> Tuple[int, int]:
     '''Parse a 'M,N' or 'MxN' integer tuple.
 
     Example:
@@ -236,13 +242,14 @@ def parse_tuple(s: Union[str, Tuple[int,int]]) -> Tuple[int, int]:
         return (int(m.group(1)), int(m.group(2)))
     raise ValueError(f'cannot parse tuple {s}')
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 @click.command()
 @click.option('--network', 'network_pkl', help='Network pickle filename', required=True)
 @click.option('--seeds', type=parse_range, help='List of random seeds', required=True)
 @click.option('--shuffle-seed', type=int, help='Random seed to use for shuffling seed order', default=None)
-@click.option('--grid', type=parse_tuple, help='Grid width/height, e.g. \'4x3\' (default: 1x1)', default=(1,1))
+@click.option('--grid', type=parse_tuple, help='Grid width/height, e.g. \'4x3\' (default: 1x1)', default=(1, 1))
 @click.option('--num-keyframes', type=int, help='Number of seeds to interpolate through.  If not specified, determine based on the length of the seeds array given by --seeds.', default=None)
 @click.option('--w-frames', type=int, help='Number of frames to interpolate between latents', default=120)
 @click.option('--trunc', 'truncation_psi', type=float, help='Truncation psi', default=1, show_default=True)
@@ -255,24 +262,23 @@ def parse_tuple(s: Union[str, Tuple[int,int]]) -> Tuple[int, int]:
 @click.option('--nrr', type=int, help='Neural rendering resolution override', default=None, show_default=True)
 @click.option('--shapes', type=bool, help='Gen shapes for shape interpolation', default=False, show_default=True)
 @click.option('--interpolate', type=bool, help='Interpolate between seeds', default=True, show_default=True)
-
 def generate_images(
-    network_pkl: str,
-    seeds: List[int],
-    shuffle_seed: Optional[int],
-    truncation_psi: float,
-    truncation_cutoff: int,
-    grid: Tuple[int,int],
-    num_keyframes: Optional[int],
-    w_frames: int,
-    outdir: str,
-    reload_modules: bool,
-    cfg: str,
-    image_mode: str,
-    sampling_multiplier: float,
-    nrr: Optional[int],
-    shapes: bool,
-    interpolate: bool,
+        network_pkl: str,
+        seeds: List[int],
+        shuffle_seed: Optional[int],
+        truncation_psi: float,
+        truncation_cutoff: int,
+        grid: Tuple[int, int],
+        num_keyframes: Optional[int],
+        w_frames: int,
+        outdir: str,
+        reload_modules: bool,
+        cfg: str,
+        image_mode: str,
+        sampling_multiplier: float,
+        nrr: Optional[int],
+        shapes: bool,
+        interpolate: bool,
 ):
     """Render a latent vector interpolation video.
 
@@ -302,17 +308,16 @@ def generate_images(
     print('Loading networks from "%s"...' % network_pkl)
     device = torch.device('cuda')
     with dnnlib.util.open_url(network_pkl) as f:
-        G = legacy.load_network_pkl(f)['G_ema'].to(device) # type: ignore
-
+        G = legacy.load_network_pkl(f)['G_ema'].to(device)  # type: ignore
 
     G.rendering_kwargs['depth_resolution'] = int(G.rendering_kwargs['depth_resolution'] * sampling_multiplier)
     G.rendering_kwargs['depth_resolution_importance'] = int(G.rendering_kwargs['depth_resolution_importance'] * sampling_multiplier)
     if nrr is not None: G.neural_rendering_resolution = nrr
 
     if truncation_cutoff == 0:
-        truncation_psi = 1.0 # truncation cutoff of 0 means no truncation anyways
+        truncation_psi = 1.0  # truncation cutoff of 0 means no truncation anyways
     if truncation_psi == 1.0:
-        truncation_cutoff = 14 # no truncation so doesn't matter where we cutoff
+        truncation_cutoff = 14  # no truncation so doesn't matter where we cutoff
 
     if interpolate:
         output = os.path.join(outdir, 'interpolation.mp4')
@@ -323,9 +328,10 @@ def generate_images(
             seeds_ = [seed]
             gen_interp_video(G=G, mp4=output, bitrate='10M', grid_dims=grid, num_keyframes=num_keyframes, w_frames=w_frames, seeds=seeds_, shuffle_seed=shuffle_seed, psi=truncation_psi, truncation_cutoff=truncation_cutoff, cfg=cfg, image_mode=image_mode)
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    generate_images() # pylint: disable=no-value-for-parameter
+    generate_images()  # pylint: disable=no-value-for-parameter
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------

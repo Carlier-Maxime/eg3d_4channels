@@ -13,17 +13,18 @@ import imgui
 import dnnlib
 from gui_utils import imgui_utils
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 class ConditioningPoseWidget:
     def __init__(self, viz):
-        self.viz        = viz
-        self.pose       = dnnlib.EasyDict(yaw=0, pitch=0, anim=False, speed=0.25)
-        self.pose_def   = dnnlib.EasyDict(self.pose)
+        self.viz = viz
+        self.pose = dnnlib.EasyDict(yaw=0, pitch=0, anim=False, speed=0.25)
+        self.pose_def = dnnlib.EasyDict(self.pose)
 
     def drag(self, dx, dy):
         viz = self.viz
-        self.pose.yaw   += -dx / viz.font_size * 3e-2
+        self.pose.yaw += -dx / viz.font_size * 3e-2
         self.pose.pitch += -dy / viz.font_size * 3e-2
 
     @imgui_utils.scoped_by_object_id
@@ -51,7 +52,7 @@ class ConditioningPoseWidget:
             if imgui_utils.button('Reset', width=-1, enabled=(self.pose != self.pose_def)):
                 self.pose = dnnlib.EasyDict(self.pose_def)
 
-        viz.args.conditioning_yaw   = self.pose.yaw
+        viz.args.conditioning_yaw = self.pose.yaw
         viz.args.conditioning_pitch = self.pose.pitch
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------

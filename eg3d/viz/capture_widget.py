@@ -16,16 +16,17 @@ import PIL.Image
 from gui_utils import imgui_utils
 from . import renderer
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 class CaptureWidget:
     def __init__(self, viz):
-        self.viz            = viz
-        self.path           = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '_screenshots'))
-        self.dump_image     = False
-        self.dump_gui       = False
-        self.defer_frames   = 0
-        self.disabled_time  = 0
+        self.viz = viz
+        self.path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '_screenshots'))
+        self.dump_image = False
+        self.dump_gui = False
+        self.defer_frames = 0
+        self.disabled_time = 0
 
     def dump_png(self, image):
         viz = self.viz
@@ -56,9 +57,9 @@ class CaptureWidget:
                 imgui.text('Capture')
                 imgui.same_line(viz.label_w)
                 _changed, self.path = imgui_utils.input_text('##path', self.path, 1024,
-                    flags=(imgui.INPUT_TEXT_AUTO_SELECT_ALL | imgui.INPUT_TEXT_ENTER_RETURNS_TRUE),
-                    width=(-1 - viz.button_w * 2 - viz.spacing * 2),
-                    help_text='PATH')
+                                                             flags=(imgui.INPUT_TEXT_AUTO_SELECT_ALL | imgui.INPUT_TEXT_ENTER_RETURNS_TRUE),
+                                                             width=(-1 - viz.button_w * 2 - viz.spacing * 2),
+                                                             help_text='PATH')
                 if imgui.is_item_hovered() and not imgui.is_item_active() and self.path != '':
                     imgui.set_tooltip(self.path)
                 imgui.same_line()
@@ -86,4 +87,4 @@ class CaptureWidget:
         if captured_frame is not None:
             self.dump_png(captured_frame)
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------

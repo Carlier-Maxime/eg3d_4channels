@@ -17,7 +17,6 @@ from PIL import Image
 from tqdm import tqdm
 from preprocess import align_img
 
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--indir', type=str, required=True)
@@ -40,11 +39,11 @@ if __name__ == '__main__':
 
         _, im_high, _, _, = align_img(im, lm, np.array(cropping_dict['lm3d_std']), target_size=1024., rescale_factor=cropping_dict['rescale_factor'])
 
-        left = int(im_high.size[0]/2 - cropping_dict['center_crop_size']/2)
-        upper = int(im_high.size[1]/2 - cropping_dict['center_crop_size']/2)
+        left = int(im_high.size[0] / 2 - cropping_dict['center_crop_size'] / 2)
+        upper = int(im_high.size[1] / 2 - cropping_dict['center_crop_size'] / 2)
         right = left + cropping_dict['center_crop_size']
         lower = upper + cropping_dict['center_crop_size']
-        im_cropped = im_high.crop((left, upper, right,lower))
+        im_cropped = im_high.crop((left, upper, right, lower))
         im_cropped = im_cropped.resize((cropping_dict['output_size'], cropping_dict['output_size']), resample=Image.LANCZOS)
 
         im_cropped.save(os.path.join(args.outdir, os.path.basename(im_path)), compress_level=args.compress_level)
