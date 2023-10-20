@@ -130,10 +130,11 @@ def training_loop(
         cudnn_benchmark=True,  # Enable torch.backends.cudnn.benchmark?
         abort_fn=None,  # Callback function for determining whether to abort training. Must return consistent results across ranks.
         progress_fn=None,  # Callback function for updating training progress. Called for all ranks.
+        single_gpu_index=0
 ):
     # Initialize.
     start_time = time.time()
-    device = torch.device('cuda', rank)
+    device = torch.device('cuda', rank if num_gpus > 1 else single_gpu_index)
     np.random.seed(random_seed * num_gpus + rank)
     torch.manual_seed(random_seed * num_gpus + rank)
     torch.backends.cudnn.benchmark = cudnn_benchmark  # Improves training speed.

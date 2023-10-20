@@ -149,6 +149,7 @@ def parse_comma_separated_list(s):
 @click.option('--p', help='Probability for --aug=fixed', metavar='FLOAT', type=click.FloatRange(min=0, max=1), default=0.2, show_default=True)
 @click.option('--target', help='Target value for --aug=ada', metavar='FLOAT', type=click.FloatRange(min=0, max=1), default=0.6, show_default=True)
 @click.option('--batch-gpu', help='Limit batch size per GPU', metavar='INT', type=click.IntRange(min=1))
+@click.option('--single-gpu-index', help='index of GPU (used if use single GPU)', metavar='INT', type=click.IntRange(min=0))
 @click.option('--cbase', help='Capacity multiplier', metavar='INT', type=click.IntRange(min=1), default=32768, show_default=True)
 @click.option('--cmax', help='Max. feature maps', metavar='INT', type=click.IntRange(min=1), default=512, show_default=True)
 @click.option('--glr', help='G learning rate  [default: varies]', metavar='FLOAT', type=click.FloatRange(min=0))
@@ -233,6 +234,7 @@ def main(**kwargs):
 
     # Hyperparameters & settings.
     c.num_gpus = opts.gpus
+    c.single_gpu_index = opts.single_gpu_index
     c.batch_size = opts.batch
     c.batch_gpu = opts.batch_gpu or opts.batch // opts.gpus
     c.G_kwargs.channel_base = c.D_kwargs.channel_base = opts.cbase
