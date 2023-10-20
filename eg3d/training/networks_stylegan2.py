@@ -289,11 +289,13 @@ class SynthesisLayer(torch.nn.Module):
                  up=1,  # Integer upsampling factor.
                  use_noise=True,  # Enable noise input?
                  activation='lrelu',  # Activation function: 'relu', 'lrelu', etc.
-                 resample_filter=[1, 3, 3, 1],  # Low-pass filter to apply when resampling activations.
+                 resample_filter=None,  # Low-pass filter to apply when resampling activations.
                  conv_clamp=None,  # Clamp the output of convolution layers to +-X, None = disable clamping.
                  channels_last=False,  # Use channels_last format for the weights?
                  ):
         super().__init__()
+        if resample_filter is None:
+            resample_filter = [1, 3, 3, 1]
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.w_dim = w_dim
@@ -379,13 +381,16 @@ class SynthesisBlock(torch.nn.Module):
                  img_channels,  # Number of output color channels.
                  is_last,  # Is this the last block?
                  architecture='skip',  # Architecture: 'orig', 'skip', 'resnet'.
-                 resample_filter=[1, 3, 3, 1],  # Low-pass filter to apply when resampling activations.
+                 resample_filter=None,  # Low-pass filter to apply when resampling activations.
                  conv_clamp=256,  # Clamp the output of convolution layers to +-X, None = disable clamping.
                  use_fp16=False,  # Use FP16 for this block?
                  fp16_channels_last=False,  # Use channels-last memory format with FP16?
                  fused_modconv_default=True,  # Default value of fused_modconv. 'inference_only' = True for inference, False for training.
+                 is_up=True,
                  **layer_kwargs,  # Arguments for SynthesisLayer.
                  ):
+        if resample_filter is None:
+            resample_filter = [1, 3, 3, 1]
         assert architecture in ['orig', 'skip', 'resnet']
         super().__init__()
         self.in_channels = in_channels
@@ -400,13 +405,14 @@ class SynthesisBlock(torch.nn.Module):
         self.register_buffer('resample_filter', upfirdn2d.setup_filter(resample_filter))
         self.num_conv = 0
         self.num_torgb = 0
+        self.is_up = is_up
 
         if in_channels == 0:
             self.const = torch.nn.Parameter(torch.randn([out_channels, resolution, resolution]))
 
         if in_channels != 0:
-            self.conv0 = SynthesisLayer(in_channels, out_channels, w_dim=w_dim, resolution=resolution, up=2,
-                                        resample_filter=resample_filter, conv_clamp=conv_clamp, channels_last=self.channels_last, **layer_kwargs)
+            self.conv0 = SynthesisLayer(in_channels, out_channels, w_dim=w_dim, resolution=resolution, up=2 if is_up else 1,
+                                        resample_filter=resample_filter if is_up else None, conv_clamp=conv_clamp, channels_last=self.channels_last, **layer_kwargs)
             self.num_conv += 1
 
         self.conv1 = SynthesisLayer(out_channels, out_channels, w_dim=w_dim, resolution=resolution,
@@ -440,7 +446,7 @@ class SynthesisBlock(torch.nn.Module):
             x = self.const.to(dtype=dtype, memory_format=memory_format)
             x = x.unsqueeze(0).repeat([ws.shape[0], 1, 1, 1])
         else:
-            misc.assert_shape(x, [None, self.in_channels, self.resolution // 2, self.resolution // 2])
+            misc.assert_shape(x, [None, self.in_channels, (self.resolution // 2) if self.is_up else self.resolution, (self.resolution // 2) if self.is_up else self.resolution])
             x = x.to(dtype=dtype, memory_format=memory_format)
 
         # Main layers.
@@ -456,7 +462,7 @@ class SynthesisBlock(torch.nn.Module):
             x = self.conv1(x, next(w_iter), fused_modconv=fused_modconv, **layer_kwargs)
 
         # ToRGB.
-        if img is not None:
+        if img is not None and self.is_up:
             misc.assert_shape(img, [None, self.img_channels, self.resolution // 2, self.resolution // 2])
             img = upfirdn2d.upsample2d(img, self.resample_filter)
         if self.is_last or self.architecture == 'skip':
