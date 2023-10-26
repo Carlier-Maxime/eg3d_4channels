@@ -34,13 +34,14 @@ class Dataset(torch.utils.data.Dataset):
                  use_labels=False,  # Enable conditioning labels? False = label dimension is zero.
                  xflip=False,  # Artificially double the size of the dataset via x-flips. Applied after max_size.
                  random_seed=0,  # Random seed to use when applying max_size.
+                 force_rgb=False
                  ):
         self._name = name
         self._raw_shape = list(raw_shape)
         self._use_labels = use_labels
         self._raw_labels = None
         self._label_shape = None
-
+        self._force_rgb = force_rgb
         # Apply max_size.
         self._raw_idx = np.arange(self._raw_shape[0], dtype=np.int64)
         if (max_size is not None) and (self._raw_idx.size > max_size):
@@ -165,10 +166,12 @@ class ImageFolderDataset(Dataset):
     def __init__(self,
                  path,  # Path to directory or zip.
                  resolution=None,  # Ensure specific resolution, None = highest available.
+                 force_rgb=False,
                  **super_kwargs,  # Additional arguments for the Dataset base class.
                  ):
         self._path = path
         self._zipfile = None
+        self._force_rgb = force_rgb
 
         if os.path.isdir(self._path):
             self._type = 'dir'
@@ -188,7 +191,7 @@ class ImageFolderDataset(Dataset):
         raw_shape = [len(self._image_fnames)] + list(self._load_raw_image(0).shape)
         if resolution is not None and (raw_shape[2] != resolution or raw_shape[3] != resolution):
             raise IOError('Image files do not match the specified resolution')
-        super().__init__(name=name, raw_shape=raw_shape, **super_kwargs)
+        super().__init__(name=name, raw_shape=raw_shape, force_rgb=force_rgb, **super_kwargs)
 
     @staticmethod
     def _file_ext(fname):
@@ -227,7 +230,7 @@ class ImageFolderDataset(Dataset):
         if image.ndim == 2:
             image = image[:, :, np.newaxis]  # HW => HWC
         image = image.transpose(2, 0, 1)  # HWC => CHW
-        return image
+        return image[:3] if self._force_rgb else image
 
     def _load_raw_labels(self):
         fname = 'dataset.json'

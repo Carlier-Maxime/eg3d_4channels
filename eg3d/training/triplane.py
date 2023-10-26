@@ -90,7 +90,7 @@ class TriPlaneGenerator(torch.nn.Module):
         depth_image = depth_samples.permute(0, 2, 1).reshape(N, 1, H, W)
 
         # Run superresolution to get final image
-        rgba_image = feature_image[:, :4]
+        rgba_image = feature_image[:, :self.img_channels]
         sr_image = self.superresolution(rgba_image, feature_image, ws, noise_mode=self.rendering_kwargs['superresolution_noise_mode'], **{k: synthesis_kwargs[k] for k in synthesis_kwargs.keys() if k != 'noise_mode'})
 
         return {'image': sr_image, 'image_raw': rgba_image, 'image_depth': depth_image}
