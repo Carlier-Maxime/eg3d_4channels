@@ -161,13 +161,7 @@ class ImportanceRenderer(torch.nn.Module):
         all_depths = torch.cat([depths1, depths2], dim=-2)
         all_colors = torch.cat([colors1, colors2], dim=-2)
         all_densities = torch.cat([densities1, densities2], dim=-2)
-
-        _, indices = torch.sort(all_depths, dim=-2)
-        all_depths = torch.gather(all_depths, -2, indices)
-        all_colors = torch.gather(all_colors, -2, indices.expand(-1, -1, -1, all_colors.shape[-1]))
-        all_densities = torch.gather(all_densities, -2, indices.expand(-1, -1, -1, 1))
-
-        return all_depths, all_colors, all_densities
+        return self.sort_samples(all_depths, all_colors, all_densities)
 
     def sample_stratified(self, ray_origins, ray_start, ray_end, depth_resolution, disparity_space_sampling=False):
         """
