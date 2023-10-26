@@ -25,12 +25,18 @@ class TriPlaneGenerator(torch.nn.Module):
                  img_resolution,  # Output resolution.
                  img_channels,  # Number of output color channels.
                  sr_num_fp16_res=0,
-                 mapping_kwargs={},  # Arguments for MappingNetwork.
-                 rendering_kwargs={},
-                 sr_kwargs={},
+                 mapping_kwargs=None,  # Arguments for MappingNetwork.
+                 rendering_kwargs=None,
+                 sr_kwargs=None,
                  **synthesis_kwargs,  # Arguments for SynthesisNetwork.
                  ):
         super().__init__()
+        if mapping_kwargs is None:
+            mapping_kwargs = {}
+        if sr_kwargs is None:
+            sr_kwargs = {}
+        if rendering_kwargs is None:
+            rendering_kwargs = {}
         self.z_dim = z_dim
         self.c_dim = c_dim
         self.w_dim = w_dim
