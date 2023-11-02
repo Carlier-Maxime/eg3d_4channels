@@ -58,13 +58,13 @@ We visualize our .mrc shape files with [UCSF Chimerax](https://www.cgl.ucsf.edu/
 To visualize a shape in ChimeraX do the following:
 
 1. Import the `.mrc` file with `File > Open`
-1. Find the selected shape in the Volume Viewer tool
+2. Find the selected shape in the Volume Viewer tool
     1. The Volume Viewer tool is located under `Tools > Volume Data > Volume Viewer`
-1. Change volume type to "Surface"
-1. Change step size to 1
-1. Change level set to 10
+3. Change volume type to "Surface"
+4. Change step size to 1
+5. Change level set to 10
     1. Note that the optimal level can vary by each object, but is usually between 2 and 20. Individual adjustment may make certain shapes slightly sharper
-1. In the `Lighting` menu in the top bar, change lighting to "Full"
+6. In the `Lighting` menu in the top bar, change lighting to "Full"
 
 ## Interactive visualization
 
