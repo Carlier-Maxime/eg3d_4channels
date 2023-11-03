@@ -101,13 +101,14 @@ def filtered_resizing(image_orig_tensor, size, f, filter_mode='antialiased'):
         ada_filtered_64 = upfirdn2d.downsample2d(ada_filtered_64, f, down=2, flip_filter=True, padding=-1)
     elif filter_mode == 'none':
         ada_filtered_64 = F.interpolate(image_orig_tensor, size=(size, size), mode='bilinear', align_corners=False)
-    elif type(filter_mode) == float:
+    elif type(filter_mode) is float:
+        filter_mode = float(filter_mode)  # remove warning
         assert 0 < filter_mode < 1
-
         filtered = F.interpolate(image_orig_tensor, size=(size, size), mode='bilinear', align_corners=False, antialias=True)
         aliased = F.interpolate(image_orig_tensor, size=(size, size), mode='bilinear', align_corners=False, antialias=False)
-        ada_filtered_64 = (1 - filter_mode) * aliased + (filter_mode) * filtered
-
+        ada_filtered_64 = (1 - filter_mode) * aliased + filter_mode * filtered
+    else:
+        ada_filtered_64 = None
     return ada_filtered_64
 
 
@@ -181,13 +182,13 @@ class DualDiscriminator(torch.nn.Module):
 
         cmap = None
         if self.c_dim > 0:
-            if self.disc_c_noise > 0: c += torch.randn_like(c) * c.std(0) * self.disc_c_noise
+            if self.disc_c_noise > 0:
+                c += torch.randn_like(c) * c.std(0) * self.disc_c_noise
             cmap = self.mapping(None, c)
         x = self.b4(x, img, cmap)
         return x
 
     def extra_repr(self):
         return f'c_dim={self.c_dim:d}, img_resolution={self.img_resolution:d}, img_channels={self.img_channels:d}'
-
 
 # ----------------------------------------------------------------------------
