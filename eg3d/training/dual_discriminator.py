@@ -13,6 +13,7 @@
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 from torch_utils import persistence
 from torch_utils.ops import upfirdn2d
 from training.networks_stylegan2 import DiscriminatorBlock, MappingNetwork, DiscriminatorEpilogue
@@ -93,18 +94,18 @@ class SingleDiscriminator(torch.nn.Module):
 
 def filtered_resizing(image_orig_tensor, size, f, filter_mode='antialiased'):
     if filter_mode == 'antialiased':
-        ada_filtered_64 = torch.nn.functional.interpolate(image_orig_tensor, size=(size, size), mode='bilinear', align_corners=False, antialias=True)
+        ada_filtered_64 = F.interpolate(image_orig_tensor, size=(size, size), mode='bilinear', align_corners=False, antialias=True)
     elif filter_mode == 'classic':
         ada_filtered_64 = upfirdn2d.upsample2d(image_orig_tensor, f, up=2)
-        ada_filtered_64 = torch.nn.functional.interpolate(ada_filtered_64, size=(size * 2 + 2, size * 2 + 2), mode='bilinear', align_corners=False)
+        ada_filtered_64 = F.interpolate(ada_filtered_64, size=(size * 2 + 2, size * 2 + 2), mode='bilinear', align_corners=False)
         ada_filtered_64 = upfirdn2d.downsample2d(ada_filtered_64, f, down=2, flip_filter=True, padding=-1)
     elif filter_mode == 'none':
-        ada_filtered_64 = torch.nn.functional.interpolate(image_orig_tensor, size=(size, size), mode='bilinear', align_corners=False)
+        ada_filtered_64 = F.interpolate(image_orig_tensor, size=(size, size), mode='bilinear', align_corners=False)
     elif type(filter_mode) == float:
         assert 0 < filter_mode < 1
 
-        filtered = torch.nn.functional.interpolate(image_orig_tensor, size=(size, size), mode='bilinear', align_corners=False, antialias=True)
-        aliased = torch.nn.functional.interpolate(image_orig_tensor, size=(size, size), mode='bilinear', align_corners=False, antialias=False)
+        filtered = F.interpolate(image_orig_tensor, size=(size, size), mode='bilinear', align_corners=False, antialias=True)
+        aliased = F.interpolate(image_orig_tensor, size=(size, size), mode='bilinear', align_corners=False, antialias=False)
         ada_filtered_64 = (1 - filter_mode) * aliased + (filter_mode) * filtered
 
     return ada_filtered_64
