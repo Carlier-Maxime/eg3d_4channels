@@ -31,11 +31,17 @@ class SingleDiscriminator(torch.nn.Module):
                  conv_clamp=256,  # Clamp the output of convolution layers to +-X, None = disable clamping.
                  cmap_dim=None,  # Dimensionality of mapped conditioning label, None = default.
                  sr_upsample_factor=1,  # Ignored for SingleDiscriminator
-                 block_kwargs={},  # Arguments for DiscriminatorBlock.
-                 mapping_kwargs={},  # Arguments for MappingNetwork.
-                 epilogue_kwargs={},  # Arguments for DiscriminatorEpilogue.
+                 block_kwargs=None,  # Arguments for DiscriminatorBlock.
+                 mapping_kwargs=None,  # Arguments for MappingNetwork.
+                 epilogue_kwargs=None,  # Arguments for DiscriminatorEpilogue.
                  ):
         super().__init__()
+        if block_kwargs is None:
+            block_kwargs = {}
+        if epilogue_kwargs is None:
+            epilogue_kwargs = {}
+        if mapping_kwargs is None:
+            mapping_kwargs = {}
         self.c_dim = c_dim
         self.img_resolution = img_resolution
         self.img_resolution_log2 = int(np.log2(img_resolution))
@@ -119,11 +125,17 @@ class DualDiscriminator(torch.nn.Module):
                  conv_clamp=256,  # Clamp the output of convolution layers to +-X, None = disable clamping.
                  cmap_dim=None,  # Dimensionality of mapped conditioning label, None = default.
                  disc_c_noise=0,  # Corrupt camera parameters with X std dev of noise before disc. pose conditioning.
-                 block_kwargs={},  # Arguments for DiscriminatorBlock.
-                 mapping_kwargs={},  # Arguments for MappingNetwork.
-                 epilogue_kwargs={},  # Arguments for DiscriminatorEpilogue.
+                 block_kwargs=None,  # Arguments for DiscriminatorBlock.
+                 mapping_kwargs=None,  # Arguments for MappingNetwork.
+                 epilogue_kwargs=None,  # Arguments for DiscriminatorEpilogue.
                  ):
         super().__init__()
+        if epilogue_kwargs is None:
+            epilogue_kwargs = {}
+        if mapping_kwargs is None:
+            mapping_kwargs = {}
+        if block_kwargs is None:
+            block_kwargs = {}
         img_channels *= 2
 
         self.c_dim = c_dim
