@@ -102,7 +102,7 @@ class FullyConnectedLayer(torch.nn.Module):
                  out_features,  # Number of output features.
                  bias=True,  # Apply additive bias before the activation function?
                  activation='linear',  # Activation function: 'relu', 'lrelu', etc.
-                 lr_multiplier=1,  # Learning rate multiplier.
+                 lr_multiplier: float = 1.,  # Learning rate multiplier.
                  bias_init=0,  # Initial value for the additive bias.
                  ):
         super().__init__()
@@ -123,6 +123,7 @@ class FullyConnectedLayer(torch.nn.Module):
                 b = b * self.bias_gain
 
         if self.activation == 'linear' and b is not None:
+            b: torch.Tensor = b  # remove warning
             x = torch.addmm(b.unsqueeze(0), x, w.t())
         else:
             x = x.matmul(w.t())
@@ -145,12 +146,14 @@ class Conv2dLayer(torch.nn.Module):
                  activation='linear',  # Activation function: 'relu', 'lrelu', etc.
                  up=1,  # Integer upsampling factor.
                  down=1,  # Integer downsampling factor.
-                 resample_filter=[1, 3, 3, 1],  # Low-pass filter to apply when resampling activations.
+                 resample_filter=None,  # Low-pass filter to apply when resampling activations.
                  conv_clamp=None,  # Clamp the output to +-X, None = disable clamping.
                  channels_last=False,  # Expect the input to have memory_format=channels_last?
                  trainable=True,  # Update the weights of this layer during training?
                  ):
         super().__init__()
+        if resample_filter is None:
+            resample_filter = [1, 3, 3, 1]
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.activation = activation
@@ -549,10 +552,12 @@ class Generator(torch.nn.Module):
                  w_dim,  # Intermediate latent (W) dimensionality.
                  img_resolution,  # Output resolution.
                  img_channels,  # Number of output color channels.
-                 mapping_kwargs={},  # Arguments for MappingNetwork.
+                 mapping_kwargs=None,  # Arguments for MappingNetwork.
                  **synthesis_kwargs,  # Arguments for SynthesisNetwork.
                  ):
         super().__init__()
+        if mapping_kwargs is None:
+            mapping_kwargs = {}
         self.z_dim = z_dim
         self.c_dim = c_dim
         self.w_dim = w_dim
@@ -581,12 +586,14 @@ class DiscriminatorBlock(torch.nn.Module):
                  first_layer_idx,  # Index of the first layer.
                  architecture='resnet',  # Architecture: 'orig', 'skip', 'resnet'.
                  activation='lrelu',  # Activation function: 'relu', 'lrelu', etc.
-                 resample_filter=[1, 3, 3, 1],  # Low-pass filter to apply when resampling activations.
+                 resample_filter=None,  # Low-pass filter to apply when resampling activations.
                  conv_clamp=None,  # Clamp the output of convolution layers to +-X, None = disable clamping.
                  use_fp16=False,  # Use FP16 for this block?
                  fp16_channels_last=False,  # Use channels-last memory format with FP16?
                  freeze_layers=0,  # Freeze-D: Number of layers to freeze.
                  ):
+        if resample_filter is None:
+            resample_filter = [1, 3, 3, 1]
         assert in_channels in [0, tmp_channels]
         assert architecture in ['orig', 'skip', 'resnet']
         super().__init__()
@@ -766,11 +773,17 @@ class Discriminator(torch.nn.Module):
                  num_fp16_res=4,  # Use FP16 for the N highest resolutions.
                  conv_clamp=256,  # Clamp the output of convolution layers to +-X, None = disable clamping.
                  cmap_dim=None,  # Dimensionality of mapped conditioning label, None = default.
-                 block_kwargs={},  # Arguments for DiscriminatorBlock.
-                 mapping_kwargs={},  # Arguments for MappingNetwork.
-                 epilogue_kwargs={},  # Arguments for DiscriminatorEpilogue.
+                 block_kwargs=None,  # Arguments for DiscriminatorBlock.
+                 mapping_kwargs=None,  # Arguments for MappingNetwork.
+                 epilogue_kwargs=None,  # Arguments for DiscriminatorEpilogue.
                  ):
         super().__init__()
+        if epilogue_kwargs is None:
+            epilogue_kwargs = {}
+        if mapping_kwargs is None:
+            mapping_kwargs = {}
+        if block_kwargs is None:
+            block_kwargs = {}
         self.c_dim = c_dim
         self.img_resolution = img_resolution
         self.img_resolution_log2 = int(np.log2(img_resolution))
