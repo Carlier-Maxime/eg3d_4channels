@@ -21,6 +21,7 @@ from torch_utils.ops import conv2d_resample
 from torch_utils.ops import upfirdn2d
 from torch_utils.ops import bias_act
 from torch_utils.ops import fma
+from training.fully_connected_layer_base import FullyConnectedLayerBase
 
 
 # ----------------------------------------------------------------------------
@@ -96,7 +97,7 @@ def modulated_conv2d(
 # ----------------------------------------------------------------------------
 
 @persistence.persistent_class
-class FullyConnectedLayer(torch.nn.Module):
+class FullyConnectedLayer(FullyConnectedLayerBase):
     def __init__(self,
                  in_features,  # Number of input features.
                  out_features,  # Number of output features.
@@ -105,33 +106,9 @@ class FullyConnectedLayer(torch.nn.Module):
                  lr_multiplier: float = 1.,  # Learning rate multiplier.
                  bias_init=0,  # Initial value for the additive bias.
                  ):
-        super().__init__()
-        self.in_features = in_features
-        self.out_features = out_features
-        self.activation = activation
+        super().__init__(in_features, out_features, activation, lr_multiplier)
         self.weight = torch.nn.Parameter(torch.randn([out_features, in_features]) / lr_multiplier)
         self.bias = torch.nn.Parameter(torch.full([out_features], np.float32(bias_init))) if bias else None
-        self.weight_gain = lr_multiplier / np.sqrt(in_features)
-        self.bias_gain = lr_multiplier
-
-    def forward(self, x):
-        w = self.weight.to(x.dtype) * self.weight_gain
-        b = self.bias
-        if b is not None:
-            b = b.to(x.dtype)
-            if self.bias_gain != 1:
-                b = b * self.bias_gain
-
-        if self.activation == 'linear' and b is not None:
-            b: torch.Tensor = b  # remove warning
-            x = torch.addmm(b.unsqueeze(0), x, w.t())
-        else:
-            x = x.matmul(w.t())
-            x = bias_act.bias_act(x, b, act=self.activation)
-        return x
-
-    def extra_repr(self):
-        return f'in_features={self.in_features:d}, out_features={self.out_features:d}, activation={self.activation:s}'
 
 
 # ----------------------------------------------------------------------------

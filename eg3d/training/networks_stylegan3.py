@@ -20,6 +20,7 @@ from torch_utils import persistence
 from torch_utils.ops import conv2d_gradfix
 from torch_utils.ops import filtered_lrelu
 from torch_utils.ops import bias_act
+from training.fully_connected_layer_base import FullyConnectedLayerBase
 
 
 # ----------------------------------------------------------------------------
@@ -70,7 +71,7 @@ def modulated_conv2d(
 # ----------------------------------------------------------------------------
 
 @persistence.persistent_class
-class FullyConnectedLayer(torch.nn.Module):
+class FullyConnectedLayer(FullyConnectedLayerBase):
     def __init__(self,
                  in_features,  # Number of input features.
                  out_features,  # Number of output features.
@@ -80,32 +81,10 @@ class FullyConnectedLayer(torch.nn.Module):
                  weight_init=1,  # Initial standard deviation of the weight tensor.
                  bias_init=0,  # Initial value of the additive bias.
                  ):
-        super().__init__()
-        self.in_features = in_features
-        self.out_features = out_features
-        self.activation = activation
+        super().__init__(in_features, out_features, activation, lr_multiplier)
         self.weight = torch.nn.Parameter(torch.randn([out_features, in_features]) * (weight_init / lr_multiplier))
         bias_init = np.broadcast_to(np.asarray(bias_init, dtype=np.float32), [out_features])
         self.bias = torch.nn.Parameter(torch.from_numpy(bias_init / lr_multiplier)) if bias else None
-        self.weight_gain = lr_multiplier / np.sqrt(in_features)
-        self.bias_gain = lr_multiplier
-
-    def forward(self, x):
-        w = self.weight.to(x.dtype) * self.weight_gain
-        b = self.bias
-        if b is not None:
-            b = b.to(x.dtype)
-            if self.bias_gain != 1:
-                b = b * self.bias_gain
-        if self.activation == 'linear' and b is not None:
-            x = torch.addmm(b.unsqueeze(0), x, w.t())
-        else:
-            x = x.matmul(w.t())
-            x = bias_act.bias_act(x, b, act=self.activation)
-        return x
-
-    def extra_repr(self):
-        return f'in_features={self.in_features:d}, out_features={self.out_features:d}, activation={self.activation:s}'
 
 
 # ----------------------------------------------------------------------------
