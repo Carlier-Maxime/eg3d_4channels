@@ -28,7 +28,7 @@ class FullyConnectedLayerBase(torch.nn.Module):
         if b is not None:
             b = b.to(x.dtype)
             if self.bias_gain != 1:
-                b *= self.bias_gain
+                b = b * self.bias_gain
         if self.activation == 'linear' and b is not None:
             x = torch.addmm(b.unsqueeze(0), x, w.t())
         else:
