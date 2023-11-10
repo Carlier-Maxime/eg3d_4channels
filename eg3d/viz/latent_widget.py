@@ -56,7 +56,7 @@ class LatentWidget:
             _clicked, self.latent.anim = imgui.checkbox('Anim', self.latent.anim)
             imgui.same_line(round(viz.font_size * 28.7))
             with imgui_utils.item_width(-2 - viz.button_w * 2 - viz.spacing * 2), imgui_utils.grayed_out(not self.latent.anim):
-                changed, speed = imgui.slider_float('##speed', self.latent.speed, -5, 5, format='Speed %.3f', power=3)
+                changed, speed = imgui.slider_float('##speed', self.latent.speed, -5, 5, format='Speed %.3f', flags=imgui.SLIDER_FLAGS_LOGARITHMIC)
                 if changed:
                     self.latent.speed = speed
             imgui.same_line()
