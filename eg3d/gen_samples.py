@@ -122,7 +122,8 @@ def generate_images(
         --network=ffhq-rebalanced-128.pkl
     """
 
-    G = loadNetwork(network_pkl, 'cuda')
+    device = torch.device('cuda')
+    G = loadNetwork(network_pkl, device)
 
     # Specify reload_modules=True if you want code modifications to take effect; otherwise uses pickled code
     if reload_modules:
