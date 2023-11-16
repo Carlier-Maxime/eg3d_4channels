@@ -111,7 +111,7 @@ def run(
     if latent_space_type == 'w':
         projector = EG3DInverter(outdir, device=torch.device('cuda'), w_avg_samples=600)
     else:
-        projector = EG3DInverterPlus(outdir, device=torch.device('cuda'), w_avg_samples=600, image_log_step=1)
+        projector = EG3DInverterPlus(outdir, device=torch.device('cuda'), w_avg_samples=600)
     w = projector.project(G, c, w_name=image_name, target=id_image, num_steps=num_steps)
 
     w = w.detach().cpu().numpy()
