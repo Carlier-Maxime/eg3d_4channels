@@ -21,7 +21,8 @@ from PIL import Image
 
 import dnnlib
 import legacy
-from projector import w_projector, w_plus_projector
+from projector.w_projector import EG3DInverter
+from projector.w_plus_projector import EG3DInverterPlus
 
 
 # ----------------------------------------------------------------------------
@@ -108,13 +109,10 @@ def run(
     id_image = torch.squeeze((from_im + 1) / 2) * 255
 
     if latent_space_type == 'w':
-
-        w = w_projector.project(G, c, outdir, id_image, device=torch.device('cuda'), w_avg_samples=600, num_steps=num_steps,
-                                w_name=image_name)
+        projector = EG3DInverter(outdir, device=torch.device('cuda'), w_avg_samples=600)
     else:
-
-        w = w_plus_projector.project(G, c, outdir, id_image, device=torch.device('cuda'), w_avg_samples=600, w_name=image_name, num_steps=num_steps)
-        pass
+        projector = EG3DInverterPlus(outdir, device=torch.device('cuda'), w_avg_samples=600, image_log_step=1)
+    w = projector.project(G, c, w_name=image_name, target=id_image, num_steps=num_steps)
 
     w = w.detach().cpu().numpy()
     np.save(f'{outdir}/{image_name}_{latent_space_type}/{image_name}_{latent_space_type}.npy', w)
