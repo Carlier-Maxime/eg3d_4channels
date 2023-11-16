@@ -15,8 +15,9 @@ import torch
 import torch.nn.functional as F
 from tqdm import tqdm
 import dnnlib
-import PIL
+import PIL.Image
 from camera_utils import LookAtPoseSampler
+
 
 def project(
         G,
@@ -46,7 +47,7 @@ def project(
         if verbose:
             print(*args)
 
-    G = copy.deepcopy(G).eval().requires_grad_(False).to(device).float() # type: ignore
+    G = copy.deepcopy(G).eval().requires_grad_(False).to(device).float()  # type: ignore
 
     # Compute w stats.
     w_avg_path = './w_avg.npy'
@@ -54,10 +55,8 @@ def project(
     if (not os.path.exists(w_avg_path)) or (not os.path.exists(w_std_path)):
         print(f'Computing W midpoint and stddev using {w_avg_samples} samples...')
         z_samples = np.random.RandomState(123).randn(w_avg_samples, G.z_dim)
-        # c_samples = c.repeat(w_avg_samples, 1)
 
         # use avg look at point
-
         camera_lookat_point = torch.tensor(G.rendering_kwargs['avg_camera_pivot'], device=device)
         cam2world_pose = LookAtPoseSampler.sample(3.14 / 2, 3.14 / 2, camera_lookat_point,
                                                   radius=G.rendering_kwargs['avg_camera_radius'], device=device)
@@ -69,25 +68,9 @@ def project(
         w_samples = G.mapping(torch.from_numpy(z_samples).to(device), c_samples)  # [N, L, C]
         w_samples = w_samples[:, :1, :].cpu().numpy().astype(np.float32)  # [N, 1, C]
         w_avg = np.mean(w_samples, axis=0, keepdims=True)  # [1, 1, C]
-        # print('save w_avg  to ./w_avg.npy')
-        # np.save('./w_avg.npy',w_avg)
-        w_avg_tensor = torch.from_numpy(w_avg).cuda()
         w_std = (np.sum((w_samples - w_avg) ** 2) / w_avg_samples) ** 0.5
-
-        # np.save(w_avg_path, w_avg)
-        # np.save(w_std_path, w_std)
     else:
-        # w_avg = np.load(w_avg_path)
-        # w_std = np.load(w_std_path)
         raise Exception(' ')
-
-    # z_samples = np.random.RandomState(123).randn(w_avg_samples, G.z_dim)
-    # c_samples = c.repeat(w_avg_samples, 1)
-    # w_samples = G.mapping(torch.from_numpy(z_samples).to(device), c_samples)  # [N, L, C]
-    # w_samples = w_samples[:, :1, :].cpu().numpy().astype(np.float32)  # [N, 1, C]
-    # w_avg = np.mean(w_samples, axis=0, keepdims=True)  # [1, 1, C]
-    # w_avg_tensor = torch.from_numpy(w_avg).cuda()
-    # w_std = (np.sum((w_samples - w_avg) ** 2) / w_avg_samples) ** 0.5
 
     start_w = initial_w if initial_w is not None else w_avg
 
@@ -95,7 +78,7 @@ def project(
     noise_bufs = {name: buf for (name, buf) in G.backbone.synthesis.named_buffers() if 'noise_const' in name}
 
     # Load VGG16 feature detector.
-    #url = 'https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada-pytorch/pretrained/metrics/vgg16.pt'
+    # url = 'https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada-pytorch/pretrained/metrics/vgg16.pt'
     url = './networks/vgg16.pt'
     with dnnlib.util.open_url(url) as f:
         vgg16 = torch.jit.load(f).eval().to(device)
@@ -125,7 +108,7 @@ def project(
         w_noise_scale = w_std * initial_noise_factor * max(0.0, 1.0 - t / noise_ramp_length) ** 2
         lr_ramp = min(1.0, (1.0 - t) / lr_rampdown_length)
         lr_ramp = 0.5 - 0.5 * np.cos(lr_ramp * np.pi)
-        lr_ramp = lr_ramp * min(1.0, t / lr_rampup_length)
+        lr_ramp *= min(1.0, t / lr_rampup_length)
         lr = initial_learning_rate * lr_ramp
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
@@ -133,7 +116,7 @@ def project(
         # Synth images from opt_w.
         w_noise = torch.randn_like(w_opt) * w_noise_scale
         ws = (w_opt + w_noise)
-        synth_images = G.synthesis(ws,c, noise_mode='const')['image']
+        synth_images = G.synthesis(ws, c, noise_mode='const')['image']
 
         if step % image_log_step == 0:
             with torch.no_grad():
