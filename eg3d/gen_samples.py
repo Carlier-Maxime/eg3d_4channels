@@ -20,8 +20,6 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-import dnnlib
-import legacy
 from camera_utils import LookAtPoseSampler, FOV_to_intrinsics
 from gen_utils import parse_range, loadNetwork
 from torch_utils import misc
@@ -39,7 +37,7 @@ def parse_vec2(s: Union[str, Tuple[float, float]]) -> Tuple[float, float]:
     if isinstance(s, tuple): return s
     parts = s.split(',')
     if len(parts) == 2:
-        return (float(parts[0]), float(parts[1]))
+        return float(parts[0]), float(parts[1])
     raise ValueError(f'cannot parse 2-vector {s}')
 
 

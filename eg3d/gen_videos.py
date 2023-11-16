@@ -22,8 +22,6 @@ import scipy.interpolate
 import torch
 from tqdm import tqdm
 
-import dnnlib
-import legacy
 from camera_utils import LookAtPoseSampler
 from gen_utils import parse_range, loadNetwork
 
@@ -212,15 +210,15 @@ def gen_interp_video(G, mp4: str, seeds, shuffle_seed=None, w_frames=60 * 4, kin
 # ----------------------------------------------------------------------------
 
 def parse_tuple(s: Union[str, Tuple[int, int]]) -> Tuple[int, int]:
-    '''Parse a 'M,N' or 'MxN' integer tuple.
+    """Parse a 'M,N' or 'MxN' integer tuple.
 
     Example:
         '4x2' returns (4,2)
         '0,1' returns (0,1)
-    '''
+    """
     if isinstance(s, tuple): return s
     if m := re.match(r'^(\d+)[x,](\d+)$', s):
-        return (int(m.group(1)), int(m.group(2)))
+        return int(m.group(1)), int(m.group(2))
     raise ValueError(f'cannot parse tuple {s}')
 
 
