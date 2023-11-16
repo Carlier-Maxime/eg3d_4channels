@@ -8,13 +8,10 @@
 
 """Project given image to the latent space of pretrained network pickle."""
 
-import copy
-import os
-
 import numpy as np
 import torch
 
-from projector.w_projector import EG3DInverter, initNoises
+from projector.w_projector import EG3DInverter
 
 
 class EG3DInverterPlus(EG3DInverter):
@@ -38,26 +35,8 @@ class EG3DInverterPlus(EG3DInverter):
         w_noise = torch.randn_like(w_opt) * w_noise_scale
         return w_opt + w_noise
 
-    def project(self,
-                G, c,
-                w_name: str,
-                target: torch.Tensor,  # [C,H,W] and dynamic range [0,255], W & H must match G output resolution
-                num_steps=1000,
-                initial_w=None
-                ):
-        assert target.shape == (G.img_channels, G.img_resolution, G.img_resolution)
-        outdir = f'{self.outdir}/{w_name}_{self.w_type_name}'
-        os.makedirs(outdir, exist_ok=True)
-
-        G = copy.deepcopy(G).eval().requires_grad_(False).to(self.device).float()  # type: ignore
+    def get_w_all(self, G, initial_w=None):
         start_w, w_std = self.computeWStats(G, initial_w)
-
-        noise_buffs = {name: buf for (name, buf) in G.backbone.synthesis.named_buffers() if 'noise_const' in name}
         start_w = np.repeat(start_w, G.backbone.mapping.num_ws, axis=1)
         w_opt = torch.tensor(start_w, dtype=torch.float32, device=self.device, requires_grad=True)
-        optimizer = torch.optim.Adam([w_opt] + list(noise_buffs.values()), betas=(0.9, 0.999), lr=0.1)
-        noise_buffs = initNoises(noise_buffs)
-
-        self.loop(G, c, self.getFeatures(target), num_steps, outdir, optimizer, w_opt, w_std, noise_buffs)
-        del G
-        return w_opt
+        return start_w, w_std, w_opt

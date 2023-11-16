@@ -163,6 +163,11 @@ class EG3DInverter:
                     buf -= buf.mean()
                     buf *= buf.square().mean().rsqrt()
 
+    def get_w_all(self, G, initial_w=None):
+        start_w, w_std = self.computeWStats(G, initial_w)
+        w_opt = torch.tensor(start_w, dtype=torch.float32, device=self.device, requires_grad=True)
+        return start_w, w_std, w_opt
+
     def project(self,
                 G, c,
                 w_name: str,
@@ -175,10 +180,9 @@ class EG3DInverter:
         os.makedirs(outdir, exist_ok=True)
 
         G = copy.deepcopy(G).eval().requires_grad_(False).to(self.device).float()  # type: ignore
-        start_w, w_std = self.computeWStats(G, initial_w)
+        start_w, w_std, w_opt = self.get_w_all(G, initial_w)
 
         noise_buffs = {name: buf for (name, buf) in G.backbone.synthesis.named_buffers() if 'noise_const' in name}
-        w_opt = torch.tensor(start_w, dtype=torch.float32, device=self.device, requires_grad=True)
         optimizer = torch.optim.Adam([w_opt] + list(noise_buffs.values()), betas=(0.9, 0.999), lr=0.1)
         noise_buffs = initNoises(noise_buffs)
 
