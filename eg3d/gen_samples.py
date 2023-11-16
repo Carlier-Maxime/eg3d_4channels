@@ -11,7 +11,7 @@
 """Generate images and shapes using pretrained network pickle."""
 
 import os
-from typing import List, Optional, Tuple, Union
+from typing import List, Tuple, Union
 
 import PIL.Image
 import click
@@ -29,12 +29,13 @@ from training.triplane import TriPlaneGenerator
 # ----------------------------------------------------------------------------
 
 def parse_vec2(s: Union[str, Tuple[float, float]]) -> Tuple[float, float]:
-    '''Parse a floating point 2-vector of syntax 'a,b'.
+    """Parse a floating point 2-vector of syntax 'a,b'.
 
     Example:
         '0,1' returns (0,1)
-    '''
-    if isinstance(s, tuple): return s
+    """
+    if isinstance(s, tuple):
+        return s
     parts = s.split(',')
     if len(parts) == 2:
         return float(parts[0]), float(parts[1])
@@ -63,7 +64,6 @@ def make_transform(translate: Tuple[float, float], angle: float):
 @click.option('--seeds', type=parse_range, help='List of random seeds (e.g., \'0,1,4-6\')', required=True)
 @click.option('--trunc', 'truncation_psi', type=float, help='Truncation psi', default=1, show_default=True)
 @click.option('--trunc-cutoff', 'truncation_cutoff', type=int, help='Truncation cutoff', default=14, show_default=True)
-@click.option('--class', 'class_idx', type=int, help='Class label (unconditional if not specified)')
 @click.option('--outdir', help='Where to save the output images', type=str, required=True, metavar='DIR')
 @click.option('--shapes', help='Export shapes as .mrc files viewable in ChimeraX', type=bool, required=False, metavar='BOOL', default=False, show_default=True)
 @click.option('--shape-res', help='', type=int, required=False, metavar='int', default=512, show_default=True)
@@ -80,7 +80,6 @@ def generate_images(
         shape_res: int,
         fov_deg: float,
         shape_format: str,
-        class_idx: Optional[int],
         reload_modules: bool,
 ):
     """Generate images using pretrained network pickle.
@@ -88,7 +87,7 @@ def generate_images(
     Examples:
 
     \b
-    # Generate an image using pre-trained FFHQ model.
+    # Generate an image using pretrained FFHQ model.
     python gen_samples.py --outdir=output --trunc=0.7 --seeds=0-5 --shapes=True\\
         --network=ffhq-rebalanced-128.pkl
     """
@@ -107,7 +106,6 @@ def generate_images(
 
     os.makedirs(outdir, exist_ok=True)
 
-    cam2world_pose = LookAtPoseSampler.sample(3.14 / 2, 3.14 / 2, torch.tensor([0, 0, 0.2], device=device), radius=2.7, device=device)
     intrinsics = FOV_to_intrinsics(fov_deg, device=device)
     cam_pivot = torch.tensor(G.rendering_kwargs.get('avg_camera_pivot', [0, 0, 0]), device=device)
     cam_radius = G.rendering_kwargs.get('avg_camera_radius', 2.7)
