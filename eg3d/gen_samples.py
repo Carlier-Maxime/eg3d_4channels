@@ -11,39 +11,21 @@
 """Generate images and shapes using pretrained network pickle."""
 
 import os
-import re
 from typing import List, Optional, Tuple, Union
 
-import click
-import dnnlib
-import numpy as np
 import PIL.Image
+import click
+import mrcfile
+import numpy as np
 import torch
 from tqdm import tqdm
-import mrcfile
 
+import dnnlib
 import legacy
 from camera_utils import LookAtPoseSampler, FOV_to_intrinsics
+from gen_utils import parse_range, loadNetwork
 from torch_utils import misc
 from training.triplane import TriPlaneGenerator
-
-
-# ----------------------------------------------------------------------------
-
-def parse_range(s: Union[str, List]) -> List[int]:
-    '''Parse a comma separated list of numbers or ranges and return a list of ints.
-
-    Example: '1,2,5-10' returns [1, 2, 5, 6, 7]
-    '''
-    if isinstance(s, list): return s
-    ranges = []
-    range_re = re.compile(r'^(\d+)-(\d+)$')
-    for p in s.split(','):
-        if m := range_re.match(p):
-            ranges.extend(range(int(m.group(1)), int(m.group(2)) + 1))
-        else:
-            ranges.append(int(p))
-    return ranges
 
 
 # ----------------------------------------------------------------------------
@@ -140,10 +122,7 @@ def generate_images(
         --network=ffhq-rebalanced-128.pkl
     """
 
-    print('Loading networks from "%s"...' % network_pkl)
-    device = torch.device('cuda')
-    with dnnlib.util.open_url(network_pkl) as f:
-        G = legacy.load_network_pkl(f)['G_ema'].to(device)  # type: ignore
+    G = loadNetwork(network_pkl, 'cuda')
 
     # Specify reload_modules=True if you want code modifications to take effect; otherwise uses pickled code
     if reload_modules:
