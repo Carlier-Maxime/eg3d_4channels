@@ -23,7 +23,7 @@ import torch
 from tqdm import tqdm
 
 from camera_utils import LookAtPoseSampler
-from gen_utils import parse_range, loadNetwork
+from gen_utils import parse_range, loadNetwork, create_samples
 
 
 # ----------------------------------------------------------------------------
@@ -43,31 +43,6 @@ def layout_grid(img, grid_w=None, grid_h=1, float_to_uint8=True, chw_to_hwc=True
     if to_numpy:
         img = img.cpu().numpy()
     return img
-
-
-def create_samples(N=256, voxel_origin=[0, 0, 0], cube_length=2.0):
-    # NOTE: the voxel_origin is actually the (bottom, left, down) corner, not the middle
-    voxel_origin = np.array(voxel_origin) - cube_length / 2
-    voxel_size = cube_length / (N - 1)
-
-    overall_index = torch.arange(0, N ** 3, 1, out=torch.LongTensor())
-    samples = torch.zeros(N ** 3, 3)
-
-    # transform first 3 columns
-    # to be the x, y, z index
-    samples[:, 2] = overall_index % N
-    samples[:, 1] = (overall_index.float() / N) % N
-    samples[:, 0] = ((overall_index.float() / N) / N) % N
-
-    # transform first 3 columns
-    # to be the x, y, z coordinate
-    samples[:, 0] = (samples[:, 0] * voxel_size) + voxel_origin[2]
-    samples[:, 1] = (samples[:, 1] * voxel_size) + voxel_origin[1]
-    samples[:, 2] = (samples[:, 2] * voxel_size) + voxel_origin[0]
-
-    num_samples = N ** 3
-
-    return samples.unsqueeze(0), voxel_origin, voxel_size
 
 
 # ----------------------------------------------------------------------------
