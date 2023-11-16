@@ -46,8 +46,7 @@ def layout_grid(img, grid_w=None, grid_h=1, float_to_uint8=True, chw_to_hwc=True
 
 
 # ----------------------------------------------------------------------------
-
-def gen_interp_video(G, mp4: str, seeds, shuffle_seed=None, w_frames=60 * 4, kind='cubic', grid_dims=(1, 1), num_keyframes=None, wraps=2, psi=1, truncation_cutoff=14, cfg='FFHQ', image_mode='image', gen_shapes=False, device=torch.device('cuda'), **video_kwargs):
+def gen_interp_video(G, mp4: str, seeds, shuffle_seed=None, w_frames=60 * 4, kind='cubic', grid_dims=(1, 1), num_keyframes=None, wraps=2, psi: float = 1, truncation_cutoff=14, cfg='FFHQ', image_mode='image', gen_shapes=False, device=torch.device('cuda'), **video_kwargs):
     grid_w = grid_dims[0]
     grid_h = grid_dims[1]
 
@@ -91,6 +90,7 @@ def gen_interp_video(G, mp4: str, seeds, shuffle_seed=None, w_frames=60 * 4, kin
     voxel_resolution = 512
     video_out = imageio.get_writer(mp4, mode='I', fps=60, codec='libx264', **video_kwargs)
 
+    outdir = None
     if gen_shapes:
         outdir = 'interpolation_{}_{}/'.format(all_seeds[0], all_seeds[1])
         os.makedirs(outdir, exist_ok=True)
@@ -105,8 +105,6 @@ def gen_interp_video(G, mp4: str, seeds, shuffle_seed=None, w_frames=60 * 4, kin
                                                           3.14 / 2 - 0.05 + pitch_range * np.cos(2 * 3.14 * frame_idx / (num_keyframes * w_frames)),
                                                           camera_lookat_point, radius=G.rendering_kwargs['avg_camera_radius'], device=device)
                 all_poses.append(cam2world_pose.squeeze().cpu().numpy())
-                focal_length = 4.2647 if cfg != 'Shapenet' else 1.7074  # shapenet has higher FOV
-                intrinsics = torch.tensor([[focal_length, 0, 0.5], [0, focal_length, 0.5], [0, 0, 1]], device=device)
                 c = torch.cat([cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
 
                 interp = grid[yi][xi]
@@ -125,6 +123,8 @@ def gen_interp_video(G, mp4: str, seeds, shuffle_seed=None, w_frames=60 * 4, kin
                 elif entangle == 'both':
                     w_c = G.mapping(z=zs[0:1], c=c[0:1], truncation_psi=psi, truncation_cutoff=truncation_cutoff)
                     img = G.synthesis(ws=w_c, c=c[0:1], noise_mode='const')[image_mode][0]
+                else:
+                    continue
 
                 if image_mode == 'image_depth':
                     img = -img
@@ -191,7 +191,8 @@ def parse_tuple(s: Union[str, Tuple[int, int]]) -> Tuple[int, int]:
         '4x2' returns (4,2)
         '0,1' returns (0,1)
     """
-    if isinstance(s, tuple): return s
+    if isinstance(s, tuple):
+        return s
     if m := re.match(r'^(\d+)[x,](\d+)$', s):
         return int(m.group(1)), int(m.group(2))
     raise ValueError(f'cannot parse tuple {s}')
@@ -209,7 +210,6 @@ def parse_tuple(s: Union[str, Tuple[int, int]]) -> Tuple[int, int]:
 @click.option('--trunc', 'truncation_psi', type=float, help='Truncation psi', default=1, show_default=True)
 @click.option('--trunc-cutoff', 'truncation_cutoff', type=int, help='Truncation cutoff', default=14, show_default=True)
 @click.option('--outdir', help='Output directory', type=str, required=True, metavar='DIR')
-@click.option('--reload_modules', help='Overload persistent modules?', type=bool, required=False, metavar='BOOL', default=False, show_default=True)
 @click.option('--cfg', help='Config', type=click.Choice(['FFHQ', 'AFHQ', 'Shapenet']), required=False, metavar='STR', default='FFHQ', show_default=True)
 @click.option('--image_mode', help='Image mode', type=click.Choice(['image', 'image_depth', 'image_raw']), required=False, metavar='STR', default='image', show_default=True)
 @click.option('--sample_mult', 'sampling_multiplier', type=float, help='Multiplier for depth sampling in volume rendering', default=2, show_default=True)
@@ -226,7 +226,6 @@ def generate_images(
         num_keyframes: Optional[int],
         w_frames: int,
         outdir: str,
-        reload_modules: bool,
         cfg: str,
         image_mode: str,
         sampling_multiplier: float,
@@ -263,12 +262,13 @@ def generate_images(
 
     G.rendering_kwargs['depth_resolution'] = int(G.rendering_kwargs['depth_resolution'] * sampling_multiplier)
     G.rendering_kwargs['depth_resolution_importance'] = int(G.rendering_kwargs['depth_resolution_importance'] * sampling_multiplier)
-    if nrr is not None: G.neural_rendering_resolution = nrr
+    if nrr is not None:
+        G.neural_rendering_resolution = nrr
 
     if truncation_cutoff == 0:
-        truncation_psi = 1.0  # truncation cutoff of 0 means no truncation anyways
+        truncation_psi = 1.0  # truncation cutoff of 0 means no truncation anyway
     if truncation_psi == 1.0:
-        truncation_cutoff = 14  # no truncation so doesn't matter where we cutoff
+        truncation_cutoff = 14  # no truncation so doesn't matter where we cut off
 
     if interpolate:
         output = os.path.join(outdir, 'interpolation.mp4')
