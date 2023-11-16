@@ -15,6 +15,10 @@ archive
 eval
 out
 .idea/
+eg3d/networks
+eg3d/projector_out
+eg3d/projector/PTI
+eg3d/projector_test_data
 
 # evaluation:
 temp/
