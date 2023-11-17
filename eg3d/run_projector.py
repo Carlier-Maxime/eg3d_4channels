@@ -52,6 +52,7 @@ def inversion(G, c, projector, image_name, target, num_steps, latent_space_type,
     os.makedirs(PTI_embedding_dir, exist_ok=True)
     np.save(f'./projector/PTI/embeddings/{image_name}/{image_name}_{latent_space_type}.npy', w)
 
+
 @click.command()
 @click.option('--network', 'network_pkl', help='Network pickle filename', required=True)
 @click.option('--outdir', help='Output directory', type=str, required=True, metavar='DIR')
@@ -63,6 +64,7 @@ def inversion(G, c, projector, image_name, target, num_steps, latent_space_type,
 @click.option('--num_steps', 'num_steps', type=int, help='Multiplier for depth sampling in volume rendering', default=500, show_default=True)
 @click.option('--img-log-step', 'image_log_step', type=int, help='number of step between image log', default=100, show_default=True)
 @click.option('--nrr', type=int, help='Neural rendering resolution override', default=None, show_default=True)
+@click.option('--batch', type=int, help='batch size, used only with dataset', default=16, show_default=True)
 def run(
         network_pkl: str,
         outdir: str,
@@ -73,7 +75,8 @@ def run(
         c_path: str,
         num_steps: int,
         dataset: str,
-        image_log_step: int
+        image_log_step: int,
+        batch: int
 ):
     """Render a latent vector interpolation video.
     Examples:
@@ -130,7 +133,7 @@ def run(
         inversion(G, c, projector, image_name, id_image, num_steps, latent_space_type, outdir)
     else:
         dataset = ImageFolderDataset(dataset, force_rgb=True, use_labels=True)
-        dataloader = DataLoader(dataset, batch_size=1, shuffle=False, pin_memory=True)
+        dataloader = DataLoader(dataset, batch_size=batch, shuffle=False, pin_memory=True)
         i = 0
         for img, c in dataloader:
             img = img.to(device)
