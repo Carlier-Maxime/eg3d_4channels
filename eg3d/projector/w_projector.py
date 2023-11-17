@@ -138,7 +138,7 @@ class EG3DInverter:
             ws = self.next_ws(G, step, num_steps, w_opt, w_std, optimizer)
             synth_images = G.synthesis(ws, c, noise_mode='const')['image']
 
-            if step % self.image_log_step == 0:
+            if self.image_log_step != 0 and step % self.image_log_step == 0:
                 with torch.no_grad():
                     vis_img = (synth_images.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
                     PIL.Image.fromarray(vis_img[0].cpu().numpy(), 'RGB').save(f'{outdir}/{step}.png')
