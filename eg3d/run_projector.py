@@ -44,6 +44,14 @@ def parse_tuple(s: Union[str, Tuple[int, int]]) -> Tuple[int, int]:
 
 # ----------------------------------------------------------------------------
 
+def inversion(G, c, projector, image_name, target, num_steps, latent_space_type, outdir):
+    w = projector.project(G, c, w_name=image_name, target=target, num_steps=num_steps)
+    w = w.detach().cpu().numpy()
+    np.save(f'{outdir}/{image_name}_{latent_space_type}/{image_name}_{latent_space_type}.npy', w)
+    PTI_embedding_dir = f'./projector/PTI/embeddings/{image_name}'
+    os.makedirs(PTI_embedding_dir, exist_ok=True)
+    np.save(f'./projector/PTI/embeddings/{image_name}/{image_name}_{latent_space_type}.npy', w)
+
 @click.command()
 @click.option('--network', 'network_pkl', help='Network pickle filename', required=True)
 @click.option('--outdir', help='Output directory', type=str, required=True, metavar='DIR')
@@ -119,18 +127,8 @@ def run(
         std = torch.tensor([0.5, 0.5, 0.5], device=device)
         from_im = (from_im - mean[:, None, None]) / std[:, None, None]
         from_im = torch.nn.functional.interpolate(from_im.unsqueeze(0), size=(512, 512), mode='bilinear', align_corners=False).squeeze(0)
-
         id_image = torch.squeeze((from_im + 1) / 2) * 255
-
-        w = projector.project(G, c, w_name=image_name, target=id_image, num_steps=num_steps)
-
-        w = w.detach().cpu().numpy()
-        np.save(f'{outdir}/{image_name}_{latent_space_type}/{image_name}_{latent_space_type}.npy', w)
-
-        PTI_embedding_dir = f'./projector/PTI/embeddings/{image_name}'
-        os.makedirs(PTI_embedding_dir, exist_ok=True)
-
-        np.save(f'./projector/PTI/embeddings/{image_name}/{image_name}_{latent_space_type}.npy', w)
+        inversion(G, c, projector, image_name, id_image, num_steps, latent_space_type, outdir)
     else:
         dataset = ImageFolderDataset(dataset, force_rgb=True, use_labels=True)
         dataloader = DataLoader(dataset, batch_size=1, shuffle=False, pin_memory=True)
@@ -139,14 +137,7 @@ def run(
             img = img.to(device)
             c = c.to(device)
             image_name = f'{i:08d}'
-            w = projector.project(G, c, w_name=image_name, target=img, num_steps=num_steps)
-
-            w = w.detach().cpu().numpy()
-            np.save(f'{outdir}/{image_name}_{latent_space_type}/{image_name}_{latent_space_type}.npy', w)
-
-            PTI_embedding_dir = f'./projector/PTI/embeddings/{image_name}'
-            os.makedirs(PTI_embedding_dir, exist_ok=True)
-            np.save(f'./projector/PTI/embeddings/{image_name}/{image_name}_{latent_space_type}.npy', w)
+            inversion(G, c, projector, image_name, img, num_steps, latent_space_type, outdir)
             i += 1
 
 
