@@ -38,8 +38,8 @@ def get_vgg16() -> None | RecursiveScriptModule:
     return vgg16
 
 
-def initNoises(noise_buffs):
-    for buf in noise_buffs.values():
+def initNoises(noise_buffs: list[torch.Tensor]):
+    for buf in noise_buffs:
         buf[:] = torch.randn_like(buf)
         buf.requires_grad = True
     return noise_buffs
@@ -80,8 +80,7 @@ class EG3DInverter:
 
             # use avg look at point
             camera_lookat_point = torch.tensor(G.rendering_kwargs['avg_camera_pivot'], device=self.device)
-            cam2world_pose = LookAtPoseSampler.sample(3.14 / 2, 3.14 / 2, camera_lookat_point,
-                                                      radius=G.rendering_kwargs['avg_camera_radius'], device=self.device)
+            cam2world_pose = LookAtPoseSampler.sample(3.14 / 2, 3.14 / 2, camera_lookat_point, radius=G.rendering_kwargs['avg_camera_radius'], device=self.device)
             focal_length = 4.2647  # FFHQ's FOV
             intrinsics = torch.tensor([[focal_length, 0, 0.5], [0, focal_length, 0.5], [0, 0, 1]], device=self.device)
             c_samples = torch.cat([cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
@@ -118,8 +117,8 @@ class EG3DInverter:
 
     def noiseRegularisation(self, noise_buffs, dist):
         reg_loss = 0.0
-        for v in noise_buffs.values():
-            noise = v[None, None, :, :]  # must be [1,1,H,W] for F.avg_pool2d()
+        for v in noise_buffs:
+            noise = v[None, None, :, :] if v.dim() == 2 else v
             while True:
                 reg_loss += (noise * torch.roll(noise, shifts=1, dims=3)).mean() ** 2
                 reg_loss += (noise * torch.roll(noise, shifts=1, dims=2)).mean() ** 2
@@ -161,7 +160,7 @@ class EG3DInverter:
 
             # Normalize noise.
             with torch.no_grad():
-                for buf in noise_buffs.values():
+                for buf in noise_buffs:
                     buf -= buf.mean()
                     buf *= buf.square().mean().rsqrt()
 
@@ -177,15 +176,23 @@ class EG3DInverter:
                 num_steps=1000,
                 initial_w=None
                 ):
-        #assert target.shape == (G.img_channels, G.img_resolution, G.img_resolution)
+        # assert target.shape == (G.img_channels, G.img_resolution, G.img_resolution)
         outdir = f'{self.outdir}/{w_name}_{self.w_type_name}'
         os.makedirs(outdir, exist_ok=True)
 
         G = copy.deepcopy(G).eval().requires_grad_(False).to(self.device).float()  # type: ignore
         start_w, w_std, w_opt = self.get_w_all(G, initial_w)
+        if target.dim() == 4:
+            start_w = start_w.repeat(target.shape[0], axis=0)
+            w_opt = w_opt.repeat(target.shape[0], 1, 1)
+            w_opt = torch.tensor(w_opt)
 
         noise_buffs = {name: buf for (name, buf) in G.backbone.synthesis.named_buffers() if 'noise_const' in name}
-        optimizer = torch.optim.Adam([w_opt] + list(noise_buffs.values()), betas=(0.9, 0.999), lr=0.1)
+        noise_buffs = list(noise_buffs.values())
+        if target.dim() == 4:
+            for i in range(len(noise_buffs)):
+                noise_buffs[i] = noise_buffs[i][None].repeat(target.shape[0], 1, 1, 1)
+        optimizer = torch.optim.Adam([w_opt] + noise_buffs, betas=(0.9, 0.999), lr=0.1)
         noise_buffs = initNoises(noise_buffs)
 
         self.loop(G, c, self.getFeatures(target), num_steps, outdir, optimizer, w_opt, w_std, noise_buffs)
