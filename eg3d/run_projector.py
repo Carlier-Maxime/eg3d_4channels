@@ -55,15 +55,13 @@ def inversion(G, c, projector, image_name, target, num_steps, latent_space_type,
 @click.command()
 @click.option('--network', 'network_pkl', help='Network pickle filename', required=True)
 @click.option('--outdir', help='Output directory', type=str, required=True, metavar='DIR')
-@click.option('--latent_space_type', help='latent_space_type', type=click.Choice(['w', 'w_plus']), required=False, metavar='STR',
-              default='w', show_default=True)
+@click.option('--latent_space_type', help='latent_space_type', type=click.Choice(['w', 'w_plus']), required=False, metavar='STR', default='w', show_default=True)
 @click.option('--image_path', help='image_path', type=str, required=True, metavar='STR', show_default=True)
 @click.option('--c_path', help='camera parameters path', type=str, required=True, metavar='STR', show_default=True)
 @click.option('--dataset', help='path to dataset for inverse all images content', type=str, default=None, metavar='STR', show_default=True)
-@click.option('--sample_mult', 'sampling_multiplier', type=float,
-              help='Multiplier for depth sampling in volume rendering', default=2, show_default=True)
-@click.option('--num_steps', 'num_steps', type=int,
-              help='Multiplier for depth sampling in volume rendering', default=500, show_default=True)
+@click.option('--sample_mult', 'sampling_multiplier', type=float, help='Multiplier for depth sampling in volume rendering', default=2, show_default=True)
+@click.option('--num_steps', 'num_steps', type=int, help='Multiplier for depth sampling in volume rendering', default=500, show_default=True)
+@click.option('--img-log-step', 'image_log_step', type=int, help='number of step between image log', default=100, show_default=True)
 @click.option('--nrr', type=int, help='Neural rendering resolution override', default=None, show_default=True)
 def run(
         network_pkl: str,
@@ -74,7 +72,8 @@ def run(
         image_path: str,
         c_path: str,
         num_steps: int,
-        dataset: str
+        dataset: str,
+        image_log_step: int
 ):
     """Render a latent vector interpolation video.
     Examples:
@@ -106,9 +105,9 @@ def run(
         G.neural_rendering_resolution = nrr
 
     if latent_space_type == 'w':
-        projector = EG3DInverter(outdir, device=torch.device('cuda'), w_avg_samples=600)
+        projector = EG3DInverter(outdir, device=torch.device('cuda'), w_avg_samples=600, image_log_step=image_log_step)
     else:
-        projector = EG3DInverterPlus(outdir, device=torch.device('cuda'), w_avg_samples=600)
+        projector = EG3DInverterPlus(outdir, device=torch.device('cuda'), w_avg_samples=600, image_log_step=image_log_step)
 
     if dataset is None:
         image = Image.open(image_path).convert('RGB')
