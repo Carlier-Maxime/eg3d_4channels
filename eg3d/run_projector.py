@@ -18,11 +18,13 @@ import click
 import numpy as np
 import torch
 from PIL import Image
+from torch.utils.data import DataLoader
 
 import dnnlib
 import legacy
 from projector.w_projector import EG3DInverter
 from projector.w_plus_projector import EG3DInverterPlus
+from training.dataset import ImageFolderDataset
 
 
 # ----------------------------------------------------------------------------
@@ -49,6 +51,7 @@ def parse_tuple(s: Union[str, Tuple[int, int]]) -> Tuple[int, int]:
               default='w', show_default=True)
 @click.option('--image_path', help='image_path', type=str, required=True, metavar='STR', show_default=True)
 @click.option('--c_path', help='camera parameters path', type=str, required=True, metavar='STR', show_default=True)
+@click.option('--dataset', help='path to dataset for inverse all images content', type=str, default=None, metavar='STR', show_default=True)
 @click.option('--sample_mult', 'sampling_multiplier', type=float,
               help='Multiplier for depth sampling in volume rendering', default=2, show_default=True)
 @click.option('--num_steps', 'num_steps', type=int,
@@ -62,7 +65,8 @@ def run(
         latent_space_type: str,
         image_path: str,
         c_path: str,
-        num_steps: int
+        num_steps: int,
+        dataset: str
 ):
     """Render a latent vector interpolation video.
     Examples:
@@ -93,34 +97,57 @@ def run(
     if nrr is not None:
         G.neural_rendering_resolution = nrr
 
-    image = Image.open(image_path).convert('RGB')
-    image_name = os.path.basename(image_path)[:-4]
-    c = np.load(c_path)
-    c = np.reshape(c, (1, 25))
-
-    c = torch.FloatTensor(c).cuda()
-
-    from_im = torch.from_numpy(np.array(image)).to(device).permute(2, 0, 1).float() / 255.0
-    mean = torch.tensor([0.5, 0.5, 0.5], device=device)
-    std = torch.tensor([0.5, 0.5, 0.5], device=device)
-    from_im = (from_im - mean[:, None, None]) / std[:, None, None]
-    from_im = torch.nn.functional.interpolate(from_im.unsqueeze(0), size=(512, 512), mode='bilinear', align_corners=False).squeeze(0)
-
-    id_image = torch.squeeze((from_im + 1) / 2) * 255
-
     if latent_space_type == 'w':
         projector = EG3DInverter(outdir, device=torch.device('cuda'), w_avg_samples=600)
     else:
         projector = EG3DInverterPlus(outdir, device=torch.device('cuda'), w_avg_samples=600)
-    w = projector.project(G, c, w_name=image_name, target=id_image, num_steps=num_steps)
 
-    w = w.detach().cpu().numpy()
-    np.save(f'{outdir}/{image_name}_{latent_space_type}/{image_name}_{latent_space_type}.npy', w)
+    if dataset is None:
+        image = Image.open(image_path).convert('RGB')
+        image_name = os.path.basename(image_path)[:-4]
+        c_ext = os.path.splitext(os.path.basename(c_path))[1]
+        if c_ext == '.npy':
+            c = np.load(c_path)
+            c = np.reshape(c, (1, 25))
+            c = torch.FloatTensor(c).cuda()
+        else:
+            c = torch.load(c_path)
+            c = torch.cat((c[1].flatten(), c[0].flatten())).reshape(1, 25).to(device)
 
-    PTI_embedding_dir = f'./projector/PTI/embeddings/{image_name}'
-    os.makedirs(PTI_embedding_dir, exist_ok=True)
+        from_im = torch.from_numpy(np.array(image)).to(device).permute(2, 0, 1).float() / 255.0
+        mean = torch.tensor([0.5, 0.5, 0.5], device=device)
+        std = torch.tensor([0.5, 0.5, 0.5], device=device)
+        from_im = (from_im - mean[:, None, None]) / std[:, None, None]
+        from_im = torch.nn.functional.interpolate(from_im.unsqueeze(0), size=(512, 512), mode='bilinear', align_corners=False).squeeze(0)
 
-    np.save(f'./projector/PTI/embeddings/{image_name}/{image_name}_{latent_space_type}.npy', w)
+        id_image = torch.squeeze((from_im + 1) / 2) * 255
+
+        w = projector.project(G, c, w_name=image_name, target=id_image, num_steps=num_steps)
+
+        w = w.detach().cpu().numpy()
+        np.save(f'{outdir}/{image_name}_{latent_space_type}/{image_name}_{latent_space_type}.npy', w)
+
+        PTI_embedding_dir = f'./projector/PTI/embeddings/{image_name}'
+        os.makedirs(PTI_embedding_dir, exist_ok=True)
+
+        np.save(f'./projector/PTI/embeddings/{image_name}/{image_name}_{latent_space_type}.npy', w)
+    else:
+        dataset = ImageFolderDataset(dataset, force_rgb=True, use_labels=True)
+        dataloader = DataLoader(dataset, batch_size=1, shuffle=False, pin_memory=True)
+        i = 0
+        for img, c in dataloader:
+            img = img.to(device)
+            c = c.to(device)
+            image_name = f'{i:08d}'
+            w = projector.project(G, c, w_name=image_name, target=img, num_steps=num_steps)
+
+            w = w.detach().cpu().numpy()
+            np.save(f'{outdir}/{image_name}_{latent_space_type}/{image_name}_{latent_space_type}.npy', w)
+
+            PTI_embedding_dir = f'./projector/PTI/embeddings/{image_name}'
+            os.makedirs(PTI_embedding_dir, exist_ok=True)
+            np.save(f'./projector/PTI/embeddings/{image_name}/{image_name}_{latent_space_type}.npy', w)
+            i += 1
 
 
 # ----------------------------------------------------------------------------

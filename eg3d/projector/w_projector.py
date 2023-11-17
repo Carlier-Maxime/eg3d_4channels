@@ -98,7 +98,9 @@ class EG3DInverter:
         return start_w, w_std
 
     def getFeatures(self, target: torch.Tensor) -> torch.Tensor:
-        target_images = target.unsqueeze(0).to(self.device).to(torch.float32)
+        if target.dim() == 3:
+            target = target.unsqueeze(0)
+        target_images = target.to(self.device).to(torch.float32)
         if target_images.shape[2] > 256:
             target_images = F.interpolate(target_images, size=(256, 256), mode='area')
         return self.vgg16(target_images, resize_images=False, return_lpips=True)
@@ -175,7 +177,7 @@ class EG3DInverter:
                 num_steps=1000,
                 initial_w=None
                 ):
-        assert target.shape == (G.img_channels, G.img_resolution, G.img_resolution)
+        #assert target.shape == (G.img_channels, G.img_resolution, G.img_resolution)
         outdir = f'{self.outdir}/{w_name}_{self.w_type_name}'
         os.makedirs(outdir, exist_ok=True)
 
