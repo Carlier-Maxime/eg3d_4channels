@@ -186,7 +186,7 @@ class MappingNetwork(torch.nn.Module):
                  layer_features=None,  # Number of intermediate features in the mapping layers, None = same as w_dim.
                  activation='lrelu',  # Activation function: 'relu', 'lrelu', etc.
                  lr_multiplier=0.01,  # Learning rate multiplier for the mapping layers.
-                 w_avg_beta=0.998,  # Decay for tracking the moving average of W during training, None = do not track.
+                 w_avg_beta: float | None = 0.998,  # Decay for tracking the moving average of W during training, None = do not track.
                  ):
         super().__init__()
         self.z_dim = z_dim
@@ -688,6 +688,7 @@ class DiscriminatorEpilogue(torch.nn.Module):
                  mbstd_num_channels=1,  # Number of features for the minibatch standard deviation layer, 0 = disable.
                  activation='lrelu',  # Activation function: 'relu', 'lrelu', etc.
                  conv_clamp=None,  # Clamp the output of convolution layers to +-X, None = disable clamping.
+                 use_cmap: bool = True,
                  ):
         assert architecture in ['orig', 'skip', 'resnet']
         super().__init__()
@@ -696,6 +697,7 @@ class DiscriminatorEpilogue(torch.nn.Module):
         self.resolution = resolution
         self.img_channels = img_channels
         self.architecture = architecture
+        self.use_cmap = use_cmap
 
         if architecture == 'skip':
             self.fromrgb = Conv2dLayer(img_channels, in_channels, kernel_size=1, activation=activation)
@@ -725,7 +727,7 @@ class DiscriminatorEpilogue(torch.nn.Module):
         x = self.out(x)
 
         # Conditioning.
-        if self.cmap_dim > 0:
+        if self.cmap_dim > 0 and self.use_cmap:
             misc.assert_shape(cmap, [None, self.cmap_dim])
             x = (x * cmap).sum(dim=1, keepdim=True) * (1 / np.sqrt(self.cmap_dim))
 
