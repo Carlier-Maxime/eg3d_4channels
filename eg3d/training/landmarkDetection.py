@@ -24,6 +24,7 @@ class LandmarkDetector(torch.nn.Module):
             epilogue_kwargs = {}
         if block_kwargs is None:
             block_kwargs = {}
+        self.nb_pts = nb_pts
         self.img_resolution = img_resolution
         self.img_resolution_log2 = int(np.log2(img_resolution))
         self.img_channels = img_channels
@@ -42,7 +43,7 @@ class LandmarkDetector(torch.nn.Module):
                                        first_layer_idx=cur_layer_idx, use_fp16=use_fp16, **block_kwargs, **common_kwargs)
             setattr(self, f'b{res}', block)
             cur_layer_idx += block.num_layers
-        self.b4 = DiscriminatorEpilogue(channels_dict[4], cmap_dim=nb_pts, resolution=4, use_cmap=False, **epilogue_kwargs, **common_kwargs)
+        self.b4 = DiscriminatorEpilogue(channels_dict[4], cmap_dim=nb_pts*3, resolution=4, use_cmap=False, **epilogue_kwargs, **common_kwargs)
 
     def forward(self, img, update_emas=False, **block_kwargs):
         _ = update_emas  # unused
@@ -52,7 +53,7 @@ class LandmarkDetector(torch.nn.Module):
             x, img = block(x, img, **block_kwargs)
 
         x = self.b4(x, img, None)
-        return x
+        return x.reshape(x.shape[0], self.nb_pts, 3)
 
     def extra_repr(self):
         return f'c_dim={self.c_dim:d}, img_resolution={self.img_resolution:d}, img_channels={self.img_channels:d}'
