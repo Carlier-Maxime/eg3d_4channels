@@ -2,7 +2,7 @@ import numpy as np
 import torch
 
 from torch_utils import persistence
-from training.networks_stylegan2 import DiscriminatorEpilogue, MappingNetwork, DiscriminatorBlock
+from training.networks_stylegan2 import DiscriminatorEpilogue, DiscriminatorBlock
 
 
 @persistence.persistent_class
