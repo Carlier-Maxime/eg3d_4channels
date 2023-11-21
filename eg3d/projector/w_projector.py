@@ -189,7 +189,7 @@ class EG3DInverter:
         if target.dim() == 4:
             start_w = start_w.repeat(target.shape[0], axis=0)
             w_opt = w_opt.repeat(target.shape[0], 1, 1)
-            w_opt = torch.tensor(w_opt)
+            w_opt = w_opt.clone().detach().requires_grad_(True)
 
         noise_buffs = {name: buf for (name, buf) in G.backbone.synthesis.named_buffers() if 'noise_const' in name}
         noise_buffs = list(noise_buffs.values())
