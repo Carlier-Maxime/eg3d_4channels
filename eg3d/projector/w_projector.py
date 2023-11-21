@@ -177,8 +177,9 @@ class EG3DInverter:
                 initial_w=None
                 ):
         # assert target.shape == (G.img_channels, G.img_resolution, G.img_resolution)
-        outdir = f'{self.outdir}/{w_name}_{self.w_type_name}'
-        os.makedirs(outdir, exist_ok=True)
+        if self.image_log_step != 0:
+            outdir = f'{self.outdir}/snapshots/{w_name}_{self.w_type_name}'
+            os.makedirs(outdir, exist_ok=True)
 
         G = copy.deepcopy(G).eval().requires_grad_(False).to(self.device).float()  # type: ignore
         start_w, w_std, w_opt = self.get_w_all(G, initial_w)
