@@ -44,8 +44,8 @@ def parse_tuple(s: Union[str, Tuple[int, int]]) -> Tuple[int, int]:
 
 # ----------------------------------------------------------------------------
 
-def inversion(G, c, projector, image_name, target, num_steps, outfile):
-    w = projector.project(G, c, w_name=image_name, target=target, num_steps=num_steps)
+def inversion(G, c, projector, image_names, target, num_steps, outfile):
+    w = projector.project(G, c, image_names=image_names, target=target, num_steps=num_steps)
     w = w.detach().cpu().numpy()
     np.save(outfile, w)
 
@@ -128,7 +128,7 @@ def run(
         from_im = torch.nn.functional.interpolate(from_im.unsqueeze(0), size=(512, 512), mode='bilinear', align_corners=False).squeeze(0)
         id_image = torch.squeeze((from_im + 1) / 2) * 255
         outfile = f'{outdir}/latents/{image_name}_{latent_space_type}.npy'
-        inversion(G, c, projector, image_name, id_image, num_steps, outfile)
+        inversion(G, c, projector, [image_name], id_image[None], num_steps, outfile)
     else:
         dataset = ImageFolderDataset(dataset, force_rgb=True, use_labels=True)
         dataloader = DataLoader(dataset, batch_size=batch, shuffle=False, pin_memory=True)
@@ -136,9 +136,12 @@ def run(
         for img, c in dataloader:
             img = img.to(device)
             c = c.to(device)
-            image_name = f'{i:08d}_{i+(batch-1):08d}'
-            outfile = f'{outdir}/latents/{image_name}_{latent_space_type}.npy'
-            inversion(G, c, projector, image_name, img, num_steps, outfile)
+            print(c.shape, img.shape)
+            image_names = []
+            for j in range(i,i+batch):
+                image_names.append(f'{j:08d}')
+            outfile = f'{outdir}/latents/{i:08d}_{i+(batch-1):08d}_{latent_space_type}.npy'
+            inversion(G, c, projector, image_names, img, num_steps, outfile)
             i += batch
 
 
