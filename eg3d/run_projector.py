@@ -44,12 +44,19 @@ def parse_tuple(s: Union[str, Tuple[int, int]]) -> Tuple[int, int]:
 
 # ----------------------------------------------------------------------------
 
-def inversion(G: TriPlaneGenerator, c, projector, image_names, target, num_steps, outdir, file_basename, save_features_map: bool = False):
-    ws = projector.project(G, c, image_names=image_names, target=target, num_steps=num_steps)
+def inversion(G: TriPlaneGenerator, c, projector, image_names, target, num_steps, outdir, files_basename, sub_folder: str = '.', save_features_map: bool = False):
+    ws = projector.project(G, c, image_names=image_names, target=target, num_steps=num_steps, sub_folder=sub_folder)
     if save_features_map:
-        np.save(f'{outdir}/features_maps/{file_basename}.npy', G.backbone.synthesis(ws).detach().cpu().numpy())
+        features_outdir = f'{outdir}/features_maps/{sub_folder}'
+        os.makedirs(features_outdir, exist_ok=True)
+        features_maps = G.backbone.synthesis(ws).detach().cpu().numpy()
+        for file_basename, features_map in zip(files_basename, features_maps):
+            np.save(f'{features_outdir}/{file_basename}.npy', features_map)
     ws = ws.detach().cpu().numpy()
-    np.save(f'{outdir}/latents/{file_basename}.npy', ws)
+    lmks_outdir = f'{outdir}/latents/{sub_folder}'
+    os.makedirs(lmks_outdir, exist_ok=True)
+    for file_basename, ws_ in zip(files_basename, ws):
+        np.save(f'{lmks_outdir}/{file_basename}.npy', ws_)
 
 
 @click.command()
@@ -96,10 +103,6 @@ def run(
     --seeds must be divisible by grid size W*H (--grid).  In this case the
     output video length will be '# seeds/(w*h)*w_frames' frames.
     """
-
-    os.makedirs(f'{outdir}/latents', exist_ok=True)
-    os.makedirs(f'{outdir}/features_maps', exist_ok=True)
-
     print('Loading networks from "%s"...' % network_pkl)
     device = torch.device('cuda')
     with dnnlib.util.open_url(network_pkl) as f:
@@ -131,7 +134,7 @@ def run(
         from_im = (from_im - mean[:, None, None]) / std[:, None, None]
         from_im = torch.nn.functional.interpolate(from_im.unsqueeze(0), size=(512, 512), mode='bilinear', align_corners=False).squeeze(0)
         id_image = torch.squeeze((from_im + 1) / 2) * 255
-        inversion(G, c, projector, [image_name], id_image[None], num_steps, outdir, f"{image_name}_{latent_space_type}", save_features_map)
+        inversion(G, c, projector, [image_name], id_image[None], num_steps, outdir, [f"{image_name}_{latent_space_type}"], save_features_map=save_features_map)
     else:
         dataset = ImageFolderDataset(dataset, force_rgb=True, use_labels=True)
         dataloader = DataLoader(dataset, batch_size=batch, shuffle=False, pin_memory=True)
@@ -145,7 +148,7 @@ def run(
             image_names = []
             for j in range(i, i + batch):
                 image_names.append(f'{j:08d}')
-            inversion(G, c, projector, image_names, img, num_steps, outdir, f"{i:08d}_{i + (batch - 1):08d}_{latent_space_type}", save_features_map)
+            inversion(G, c, projector, image_names, img, num_steps, outdir, [f"{j:08d}_{latent_space_type}" for j in range(i, i+batch)], sub_folder=f"{i//1000:05d}", save_features_map=save_features_map)
             i += batch
 
 
