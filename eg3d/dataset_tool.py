@@ -334,6 +334,18 @@ def open_dest(dest: str) -> Tuple[str, Callable[[str, Union[bytes, str]], None],
         return dest, folder_write_bytes, lambda: None
 
 
+def saveFeaturesAndLmks(lmks_json_file, features_dir, outdir, max_elements: int = -1):
+    with open(lmks_json_file) as f:
+        lmks = json.load(f)['labels']
+    keys = lmks.keys()
+    lmks = [lmks[key] for key in keys]
+    features = [np.load(f'{features_dir}/{os.path.splitext(key)[0]}.npy') for i, key in enumerate(keys) if i < max_elements or max_elements == -1]
+    for i, key in enumerate(keys):
+        if i >= max_elements > -1:
+            break
+        np.savez(f'{outdir}/{os.path.splitext(key)[0]}.npz', features_map=features[i], lmks=lmks[i])
+
+
 # ----------------------------------------------------------------------------
 
 @click.command()
