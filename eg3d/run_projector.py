@@ -24,6 +24,7 @@ import dnnlib
 import legacy
 from projector.w_projector import EG3DInverter
 from training.dataset import ImageFolderDataset
+from training.triplane import TriPlaneGenerator
 
 
 # ----------------------------------------------------------------------------
@@ -43,10 +44,12 @@ def parse_tuple(s: Union[str, Tuple[int, int]]) -> Tuple[int, int]:
 
 # ----------------------------------------------------------------------------
 
-def inversion(G, c, projector, image_names, target, num_steps, outfile):
-    w = projector.project(G, c, image_names=image_names, target=target, num_steps=num_steps)
-    w = w.detach().cpu().numpy()
-    np.save(outfile, w)
+def inversion(G: TriPlaneGenerator, c, projector, image_names, target, num_steps, outdir, file_basename, save_features_map: bool = False):
+    ws = projector.project(G, c, image_names=image_names, target=target, num_steps=num_steps)
+    if save_features_map:
+        np.save(f'{outdir}/features_maps/{file_basename}.npy', G.backbone.synthesis(ws).detach().cpu().numpy())
+    ws = ws.detach().cpu().numpy()
+    np.save(f'{outdir}/latents/{file_basename}.npy', ws)
 
 
 @click.command()
@@ -62,6 +65,7 @@ def inversion(G, c, projector, image_names, target, num_steps, outfile):
 @click.option('--nrr', type=int, help='Neural rendering resolution override', default=None, show_default=True)
 @click.option('--batch', type=int, help='batch size, used only with dataset', default=16, show_default=True)
 @click.option('--limit', type=int, help='limit images, used only with dataset', default=-1, show_default=True)
+@click.option('--save-features-map', type=bool, help='save features map', default=False, is_flag=True, show_default=True)
 def run(
         network_pkl: str,
         outdir: str,
@@ -74,7 +78,8 @@ def run(
         dataset: str,
         image_log_step: int,
         batch: int,
-        limit: int
+        limit: int,
+        save_features_map: bool
 ):
     """Render a latent vector interpolation video.
     Examples:
@@ -93,6 +98,7 @@ def run(
     """
 
     os.makedirs(f'{outdir}/latents', exist_ok=True)
+    os.makedirs(f'{outdir}/features_maps', exist_ok=True)
 
     print('Loading networks from "%s"...' % network_pkl)
     device = torch.device('cuda')
@@ -125,8 +131,7 @@ def run(
         from_im = (from_im - mean[:, None, None]) / std[:, None, None]
         from_im = torch.nn.functional.interpolate(from_im.unsqueeze(0), size=(512, 512), mode='bilinear', align_corners=False).squeeze(0)
         id_image = torch.squeeze((from_im + 1) / 2) * 255
-        outfile = f'{outdir}/latents/{image_name}_{latent_space_type}.npy'
-        inversion(G, c, projector, [image_name], id_image[None], num_steps, outfile)
+        inversion(G, c, projector, [image_name], id_image[None], num_steps, outdir, f"{image_name}_{latent_space_type}", save_features_map)
     else:
         dataset = ImageFolderDataset(dataset, force_rgb=True, use_labels=True)
         dataloader = DataLoader(dataset, batch_size=batch, shuffle=False, pin_memory=True)
@@ -140,8 +145,7 @@ def run(
             image_names = []
             for j in range(i, i + batch):
                 image_names.append(f'{j:08d}')
-            outfile = f'{outdir}/latents/{i:08d}_{i + (batch - 1):08d}_{latent_space_type}.npy'
-            inversion(G, c, projector, image_names, img, num_steps, outfile)
+            inversion(G, c, projector, image_names, img, num_steps, outdir, f"{i:08d}_{i + (batch - 1):08d}_{latent_space_type}", save_features_map)
             i += batch
 
 
