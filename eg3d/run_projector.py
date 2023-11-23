@@ -61,6 +61,7 @@ def inversion(G, c, projector, image_names, target, num_steps, outfile):
 @click.option('--img-log-step', 'image_log_step', type=int, help='number of step between image log', default=100, show_default=True)
 @click.option('--nrr', type=int, help='Neural rendering resolution override', default=None, show_default=True)
 @click.option('--batch', type=int, help='batch size, used only with dataset', default=16, show_default=True)
+@click.option('--limit', type=int, help='limit images, used only with dataset', default=-1, show_default=True)
 def run(
         network_pkl: str,
         outdir: str,
@@ -72,7 +73,8 @@ def run(
         num_steps: int,
         dataset: str,
         image_log_step: int,
-        batch: int
+        batch: int,
+        limit: int
 ):
     """Render a latent vector interpolation video.
     Examples:
@@ -130,6 +132,8 @@ def run(
         dataloader = DataLoader(dataset, batch_size=batch, shuffle=False, pin_memory=True)
         i = 0
         for img, c in dataloader:
+            if i >= limit > -1:
+                break
             img = img.to(device)
             c = c.to(device)
             print(c.shape, img.shape)
