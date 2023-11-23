@@ -246,4 +246,63 @@ class ImageFolderDataset(Dataset):
         labels = labels.astype({1: np.int64, 2: np.float32}[labels.ndim])
         return labels
 
+
+# ----------------------------------------------------------------------------
+
+class NumpyFolderDataset(torch.utils.data.Dataset):
+    def __init__(self, path):
+        self._path = path
+        self._zipfile = None
+
+        if os.path.isdir(self._path):
+            self._type = 'dir'
+            self._all_fnames = {os.path.relpath(os.path.join(root, fname), start=self._path) for root, _dirs, files in os.walk(self._path) for fname in files}
+        elif self._file_ext(self._path) == '.zip':
+            self._type = 'zip'
+            self._all_fnames = set(self._get_zipfile().namelist())
+        else:
+            raise IOError('Path must point to a directory or zip')
+
+        self._numpy_fnames = sorted(fname for fname in self._all_fnames if self._file_ext(fname) in '.npy')
+        if len(self._numpy_fnames) == 0:
+            raise IOError('No image files found in the specified path')
+
+        name = os.path.splitext(os.path.basename(self._path))[0]
+        raw_shape = [len(self._numpy_fnames)] + list(self._load_raw_image(0).shape)
+        super().__init__(name=name, raw_shape=raw_shape, force_rgb=False)
+
+    @staticmethod
+    def _file_ext(fname):
+        return os.path.splitext(fname)[1].lower()
+
+    def _get_zipfile(self):
+        assert self._type == 'zip'
+        if self._zipfile is None:
+            self._zipfile = zipfile.ZipFile(self._path)
+        return self._zipfile
+
+    def _open_file(self, fname):
+        if self._type == 'dir':
+            return open(os.path.join(self._path, fname), 'rb')
+        if self._type == 'zip':
+            return self._get_zipfile().open(fname, 'r')
+        return None
+
+    def close(self):
+        try:
+            if self._zipfile is not None:
+                self._zipfile.close()
+        finally:
+            self._zipfile = None
+
+    def __del__(self):
+        self.close()
+
+    def __len__(self):
+        return self._raw_idx.size
+
+    def __getitem__(self, idx):
+        data = np.array(self._numpy_fnames[idx])
+        return torch.tensor(data[0]), torch.tensor(data[1])
+
 # ----------------------------------------------------------------------------
