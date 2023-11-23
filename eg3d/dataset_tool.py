@@ -336,12 +336,12 @@ def open_dest(dest: str) -> Tuple[str, Callable[[str, Union[bytes, str]], None],
 
 def combineFeaturesAndLmks(features_dir, lmks_dir, outdir, max_elements: int = -1):
     keys = sorted({os.path.relpath(os.path.join(root, fname), start=lmks_dir) for root, _dirs, files in os.walk(lmks_dir) for fname in files if os.path.splitext(fname)[1].lower() == '.npy'})
-    lmks = [np.load(f'{lmks_dir}/{key}') for i, key in enumerate(keys) if i < max_elements or max_elements == -1]
-    features = [np.load(f'{features_dir}/{key}') for i, key in enumerate(keys) if i < max_elements or max_elements == -1]
     for i, key in enumerate(keys):
         if i >= max_elements > -1:
             break
-        np.savez(f'{outdir}/{os.path.splitext(key)[0]}.npz', features_map=features[i], lmks=lmks[i])
+        lmks = np.load(f'{lmks_dir}/{key}')
+        features_map = np.load(f'{features_dir}/{key}')
+        np.savez(f'{outdir}/{os.path.splitext(key)[0]}.npz', features_map=features_map, lmks=lmks)
 
 
 # ----------------------------------------------------------------------------
