@@ -263,13 +263,9 @@ class NumpyFolderDataset(torch.utils.data.Dataset):
         else:
             raise IOError('Path must point to a directory or zip')
 
-        self._numpy_fnames = sorted(fname for fname in self._all_fnames if self._file_ext(fname) in '.npy')
+        self._numpy_fnames = sorted(fname for fname in self._all_fnames if self._file_ext(fname) in ['.npy', '.npz'])
         if len(self._numpy_fnames) == 0:
-            raise IOError('No image files found in the specified path')
-
-        name = os.path.splitext(os.path.basename(self._path))[0]
-        raw_shape = [len(self._numpy_fnames)] + list(self._load_raw_image(0).shape)
-        super().__init__(name=name, raw_shape=raw_shape, force_rgb=False)
+            raise IOError('No numpy files found in the specified path')
 
     @staticmethod
     def _file_ext(fname):
@@ -299,10 +295,11 @@ class NumpyFolderDataset(torch.utils.data.Dataset):
         self.close()
 
     def __len__(self):
-        return self._raw_idx.size
+        return len(self._numpy_fnames)
 
     def __getitem__(self, idx):
-        data = np.array(self._numpy_fnames[idx])
-        return torch.tensor(data[0]), torch.tensor(data[1])
+        fname = self._numpy_fnames[idx]
+        data = np.load(f'{self._path}/{fname}')
+        return [torch.tensor(data[key]) for key in data.keys()] if os.path.splitext(fname)[1].lower() == '.npz' else torch.tensor(data)
 
 # ----------------------------------------------------------------------------
