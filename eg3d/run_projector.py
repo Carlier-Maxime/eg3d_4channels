@@ -23,7 +23,6 @@ from torch.utils.data import DataLoader
 import dnnlib
 import legacy
 from projector.w_projector import EG3DInverter
-from projector.w_plus_projector import EG3DInverterPlus
 from training.dataset import ImageFolderDataset
 
 
@@ -104,10 +103,7 @@ def run(
     if nrr is not None:
         G.neural_rendering_resolution = nrr
 
-    if latent_space_type == 'w':
-        projector = EG3DInverter(outdir, device=torch.device('cuda'), w_avg_samples=600, image_log_step=image_log_step)
-    else:
-        projector = EG3DInverterPlus(outdir, device=torch.device('cuda'), w_avg_samples=600, image_log_step=image_log_step)
+    projector = EG3DInverter(outdir, device=torch.device('cuda'), w_avg_samples=600, image_log_step=image_log_step, repeat_w=latent_space_type == 'w')
 
     if dataset is None:
         image = Image.open(image_path).convert('RGB')
@@ -138,9 +134,9 @@ def run(
             c = c.to(device)
             print(c.shape, img.shape)
             image_names = []
-            for j in range(i,i+batch):
+            for j in range(i, i + batch):
                 image_names.append(f'{j:08d}')
-            outfile = f'{outdir}/latents/{i:08d}_{i+(batch-1):08d}_{latent_space_type}.npy'
+            outfile = f'{outdir}/latents/{i:08d}_{i + (batch - 1):08d}_{latent_space_type}.npy'
             inversion(G, c, projector, image_names, img, num_steps, outfile)
             i += batch
 

@@ -56,7 +56,8 @@ class EG3DInverter:
                  noise_ramp_length=0.75,
                  regularize_noise_weight=1e5,
                  device: torch.device = 'cuda',
-                 image_log_step=100
+                 image_log_step=100,
+                 repeat_w: bool = False
                  ):
         self.outdir = outdir
         self.w_avg_samples = w_avg_samples
@@ -69,7 +70,8 @@ class EG3DInverter:
         self.device = device
         self.image_log_step = image_log_step
         self.vgg16 = get_vgg16().to(device)
-        self.w_type_name = 'w'
+        self.w_type_name = 'w' if repeat_w else 'w_plus'
+        self.repeat_w = repeat_w
 
     def computeWStats(self, G, initial_w=None):
         print(f'Computing W midpoint and stddev using {self.w_avg_samples} samples...')
@@ -125,7 +127,8 @@ class EG3DInverter:
     def next_ws(self, G, step, num_steps, w_opt, w_std, optimizer):
         w_noise_scale = self.learningRateSchedule(step, num_steps, w_std, optimizer)
         w_noise = torch.randn_like(w_opt) * w_noise_scale
-        return (w_opt + w_noise).repeat([1, G.backbone.mapping.num_ws, 1])
+        ws = (w_opt + w_noise)
+        return ws.repeat([1, G.backbone.mapping.num_ws, 1]) if self.repeat_w else ws
 
     def loop(self, G, c, target_features, num_steps, image_names, optimizer, w_opt, w_std, noise_buffs):
         for step in tqdm(range(num_steps)):
@@ -164,6 +167,8 @@ class EG3DInverter:
 
     def get_w_all(self, G, initial_w=None):
         start_w, w_std = self.computeWStats(G, initial_w)
+        if not self.repeat_w:
+            start_w = np.repeat(start_w, G.backbone.mapping.num_ws, axis=1)
         w_opt = torch.tensor(start_w, dtype=torch.float32, device=self.device, requires_grad=True)
         return start_w, w_std, w_opt
 
@@ -195,4 +200,4 @@ class EG3DInverter:
         noise_buffs = initNoises(noise_buffs)
 
         self.loop(G, c, self.getFeatures(target), num_steps, image_names, optimizer, w_opt, w_std, noise_buffs)
-        return w_opt.repeat([1, G.backbone.mapping.num_ws, 1])
+        return w_opt.repeat([1, G.backbone.mapping.num_ws, 1]) if self.repeat_w else w_opt
