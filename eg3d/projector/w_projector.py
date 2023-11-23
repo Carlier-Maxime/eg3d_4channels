@@ -72,26 +72,21 @@ class EG3DInverter:
         self.w_type_name = 'w'
 
     def computeWStats(self, G, initial_w=None):
-        w_avg_path = './w_avg.npy'
-        w_std_path = './w_std.npy'
-        if (not os.path.exists(w_avg_path)) or (not os.path.exists(w_std_path)):
-            print(f'Computing W midpoint and stddev using {self.w_avg_samples} samples...')
-            z_samples = np.random.RandomState(123).randn(self.w_avg_samples, G.z_dim)
+        print(f'Computing W midpoint and stddev using {self.w_avg_samples} samples...')
+        z_samples = np.random.RandomState(123).randn(self.w_avg_samples, G.z_dim)
 
-            # use avg look at point
-            camera_lookat_point = torch.tensor(G.rendering_kwargs['avg_camera_pivot'], device=self.device)
-            cam2world_pose = LookAtPoseSampler.sample(3.14 / 2, 3.14 / 2, camera_lookat_point, radius=G.rendering_kwargs['avg_camera_radius'], device=self.device)
-            focal_length = 4.2647  # FFHQ's FOV
-            intrinsics = torch.tensor([[focal_length, 0, 0.5], [0, focal_length, 0.5], [0, 0, 1]], device=self.device)
-            c_samples = torch.cat([cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
-            c_samples = c_samples.repeat(self.w_avg_samples, 1)
+        # use avg look at point
+        camera_lookat_point = torch.tensor(G.rendering_kwargs['avg_camera_pivot'], device=self.device)
+        cam2world_pose = LookAtPoseSampler.sample(3.14 / 2, 3.14 / 2, camera_lookat_point, radius=G.rendering_kwargs['avg_camera_radius'], device=self.device)
+        focal_length = 4.2647  # FFHQ's FOV
+        intrinsics = torch.tensor([[focal_length, 0, 0.5], [0, focal_length, 0.5], [0, 0, 1]], device=self.device)
+        c_samples = torch.cat([cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
+        c_samples = c_samples.repeat(self.w_avg_samples, 1)
 
-            w_samples = G.mapping(torch.from_numpy(z_samples).to(self.device), c_samples)  # [N, L, C]
-            w_samples = w_samples[:, :1, :].cpu().numpy().astype(np.float32)  # [N, 1, C]
-            w_avg = np.mean(w_samples, axis=0, keepdims=True)  # [1, 1, C]
-            w_std = (np.sum((w_samples - w_avg) ** 2) / self.w_avg_samples) ** 0.5
-        else:
-            raise Exception(' ')
+        w_samples = G.mapping(torch.from_numpy(z_samples).to(self.device), c_samples)  # [N, L, C]
+        w_samples = w_samples[:, :1, :].cpu().numpy().astype(np.float32)  # [N, 1, C]
+        w_avg = np.mean(w_samples, axis=0, keepdims=True)  # [1, 1, C]
+        w_std = (np.sum((w_samples - w_avg) ** 2) / self.w_avg_samples) ** 0.5
 
         start_w = initial_w if initial_w is not None else w_avg
         return start_w, w_std
