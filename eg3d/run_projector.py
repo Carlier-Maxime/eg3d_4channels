@@ -44,19 +44,15 @@ def parse_tuple(s: Union[str, Tuple[int, int]]) -> Tuple[int, int]:
 
 # ----------------------------------------------------------------------------
 
-def inversion(G: TriPlaneGenerator, c, projector, image_names, target, num_steps, outdir, files_basename, sub_folder: str = '.', save_features_map: bool = False):
-    ws = projector.project(G, c, image_names=image_names, target=target, num_steps=num_steps, sub_folder=sub_folder)
+def inversion(G: TriPlaneGenerator, c, projector, target, num_steps, image_names, latents_outdir, features_outdir, snapshots_outdir, save_features_map: bool = False):
+    ws = projector.project(G, c, target=target, image_names=image_names, snapshots_outdir=snapshots_outdir, num_steps=num_steps)
     if save_features_map:
-        features_outdir = f'{outdir}/features_maps/{sub_folder}'
-        os.makedirs(features_outdir, exist_ok=True)
         features_maps = G.backbone.synthesis(ws).detach().cpu().numpy()
-        for file_basename, features_map in zip(files_basename, features_maps):
+        for file_basename, features_map in zip(image_names, features_maps):
             np.save(f'{features_outdir}/{file_basename}.npy', features_map)
     ws = ws.detach().cpu().numpy()
-    lmks_outdir = f'{outdir}/latents/{sub_folder}'
-    os.makedirs(lmks_outdir, exist_ok=True)
-    for file_basename, ws_ in zip(files_basename, ws):
-        np.save(f'{lmks_outdir}/{file_basename}.npy', ws_)
+    for file_basename, ws_ in zip(image_names, ws):
+        np.save(f'{latents_outdir}/{file_basename}.npy', ws_)
 
 
 @click.command()
@@ -114,8 +110,10 @@ def run(
     if nrr is not None:
         G.neural_rendering_resolution = nrr
 
-    projector = EG3DInverter(outdir, device=torch.device('cuda'), w_avg_samples=600, image_log_step=image_log_step, repeat_w=latent_space_type == 'w')
-
+    projector = EG3DInverter(device=torch.device('cuda'), w_avg_samples=600, image_log_step=image_log_step, repeat_w=latent_space_type == 'w')
+    out_features = dir_features = f'{outdir}/features_maps'
+    out_latents = dir_latents = f'{outdir}/latents'
+    out_snapshots = dir_snapshots = f'{outdir}/snapshots'
     if dataset is None:
         image = Image.open(image_path).convert('RGB')
         image_name = os.path.basename(image_path)[:-4]
@@ -134,7 +132,7 @@ def run(
         from_im = (from_im - mean[:, None, None]) / std[:, None, None]
         from_im = torch.nn.functional.interpolate(from_im.unsqueeze(0), size=(512, 512), mode='bilinear', align_corners=False).squeeze(0)
         id_image = torch.squeeze((from_im + 1) / 2) * 255
-        inversion(G, c, projector, [image_name], id_image[None], num_steps, outdir, [f"{image_name}_{latent_space_type}"], save_features_map=save_features_map)
+        inversion(G, c, projector, id_image[None], num_steps, [image_name], out_latents, out_features, out_snapshots, save_features_map=save_features_map)
     else:
         dataset = ImageFolderDataset(dataset, force_rgb=True, use_labels=True)
         dataloader = DataLoader(dataset, batch_size=batch, shuffle=False, pin_memory=True)
@@ -142,13 +140,18 @@ def run(
         for img, c in dataloader:
             if i >= limit > -1:
                 break
+            if i % 1000 == 0:
+                sub_folder = f'{i//1000:05d}'
+                out_features = f'{dir_features}/{sub_folder}'
+                out_latents = f'{dir_latents}/{sub_folder}'
+                out_snapshots = f'{dir_snapshots}/{sub_folder}'
+                os.makedirs(out_features, exist_ok=True)
+                os.makedirs(out_latents, exist_ok=True)
+                os.makedirs(out_snapshots, exist_ok=True)
             img = img.to(device)
             c = c.to(device)
-            print(c.shape, img.shape)
-            image_names = []
-            for j in range(i, i + batch):
-                image_names.append(f'{j:08d}')
-            inversion(G, c, projector, image_names, img, num_steps, outdir, [f"{j:08d}_{latent_space_type}" for j in range(i, i+batch)], sub_folder=f"{i//1000:05d}", save_features_map=save_features_map)
+            image_names = [f'{j:08d}' for j in range(i, i+batch)]
+            inversion(G, c, projector, img, num_steps, image_names, out_latents, out_features, out_snapshots, save_features_map=save_features_map)
             i += batch
 
 

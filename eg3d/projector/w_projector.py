@@ -47,7 +47,6 @@ def initNoises(noise_buffs: list[torch.Tensor]):
 
 class EG3DInverter:
     def __init__(self,
-                 outdir,
                  w_avg_samples=10000,
                  initial_learning_rate=0.01,
                  initial_noise_factor=0.05,
@@ -59,7 +58,6 @@ class EG3DInverter:
                  image_log_step=100,
                  repeat_w: bool = False
                  ):
-        self.outdir = outdir
         self.w_avg_samples = w_avg_samples
         self.initial_learning_rate = initial_learning_rate
         self.initial_noise_factor = initial_noise_factor
@@ -130,7 +128,7 @@ class EG3DInverter:
         ws = (w_opt + w_noise)
         return ws.repeat([1, G.backbone.mapping.num_ws, 1]) if self.repeat_w else ws
 
-    def loop(self, G, c, target_features, num_steps, image_names, optimizer, w_opt, w_std, noise_buffs, sub_folder: str = '.'):
+    def loop(self, G, c, target_features, num_steps, image_names, optimizer, w_opt, w_std, noise_buffs, snapshots_outdir):
         for step in tqdm(range(num_steps)):
             ws = self.next_ws(G, step, num_steps, w_opt, w_std, optimizer)
             synth_images = G.synthesis(ws, c, noise_mode='const')['image']
@@ -140,7 +138,7 @@ class EG3DInverter:
                     vis_img = (synth_images.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
                     i = 0
                     for img in vis_img:
-                        PIL.Image.fromarray(img.cpu().numpy(), 'RGB').save(f'{self.outdir}/snapshots/{sub_folder}/{image_names[i]}_{self.w_type_name}/{step}.png')
+                        PIL.Image.fromarray(img.cpu().numpy(), 'RGB').save(f'{snapshots_outdir}/{image_names[i]}_{self.w_type_name}/{step}.png')
                         i += 1
 
             # Down sample image to 256x256 if it's larger than that. VGG was built for 224x224 images.
@@ -174,15 +172,15 @@ class EG3DInverter:
 
     def project(self,
                 G, c,
-                image_names: list[str],
                 target: torch.Tensor,  # [N,C,H,W] and dynamic range [0,255], W & H must match G output resolution
-                num_steps=1000,
+                image_names: list[str],
+                snapshots_outdir: str,
+                num_steps: int = 1000,
                 initial_w=None,
-                sub_folder: str = '.'
                 ):
         if self.image_log_step != 0:
             for img_name in image_names:
-                outdir = f'{self.outdir}/snapshots/{sub_folder}/{img_name}_{self.w_type_name}'
+                outdir = f'{snapshots_outdir}/{img_name}_{self.w_type_name}'
                 os.makedirs(outdir, exist_ok=True)
 
         G = copy.deepcopy(G).eval().requires_grad_(False).to(self.device).float()  # type: ignore
@@ -200,5 +198,5 @@ class EG3DInverter:
         optimizer = torch.optim.Adam([w_opt] + noise_buffs, betas=(0.9, 0.999), lr=0.1)
         noise_buffs = initNoises(noise_buffs)
 
-        self.loop(G, c, self.getFeatures(target), num_steps, image_names, optimizer, w_opt, w_std, noise_buffs, sub_folder=sub_folder)
+        self.loop(G, c, self.getFeatures(target), num_steps, image_names, optimizer, w_opt, w_std, noise_buffs, snapshots_outdir)
         return w_opt.repeat([1, G.backbone.mapping.num_ws, 1]) if self.repeat_w else w_opt
