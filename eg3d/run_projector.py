@@ -18,7 +18,7 @@ import click
 import numpy as np
 import torch
 from PIL import Image
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 
 import dnnlib
 import legacy
@@ -44,8 +44,8 @@ def parse_tuple(s: Union[str, Tuple[int, int]]) -> Tuple[int, int]:
 
 # ----------------------------------------------------------------------------
 
-def inversion(G: TriPlaneGenerator, c, projector, target, num_steps, image_names, latents_outdir, features_outdir, snapshots_outdir, save_features_map: bool = False):
-    ws = projector.project(G, c, target=target, image_names=image_names, snapshots_outdir=snapshots_outdir, num_steps=num_steps)
+def inversion(G: TriPlaneGenerator, c, projector, target, num_steps, image_names, latents_outdir, features_outdir, snapshots_outdir, save_features_map: bool = False, verbose: bool = True):
+    ws = projector.project(G, c, target=target, image_names=image_names, snapshots_outdir=snapshots_outdir, num_steps=num_steps, verbose=verbose)
     if save_features_map:
         features_maps = G.backbone.synthesis(ws).detach().cpu().numpy()
         for file_basename, features_map in zip(image_names, features_maps):
@@ -53,6 +53,29 @@ def inversion(G: TriPlaneGenerator, c, projector, target, num_steps, image_names
     ws = ws.detach().cpu().numpy()
     for file_basename, ws_ in zip(image_names, ws):
         np.save(f'{latents_outdir}/{file_basename}.npy', ws_)
+
+
+def subprocess_fn(rank, projector, G, num_steps, datasets, batch, out_latents, out_features, out_snapshots, save_features_map):
+    dir_features = out_features
+    dir_latents = out_latents
+    dir_snapshots = out_snapshots
+    device = torch.device('cuda', rank)
+    dataloader = DataLoader(datasets[rank], batch_size=batch, shuffle=False, pin_memory=True)
+    i = 0
+    for img, c in dataloader:
+        if i % 1000 == 0:
+            sub_folder = f'{i // 1000:05d}'
+            out_features = f'{dir_features}/{sub_folder}'
+            out_latents = f'{dir_latents}/{sub_folder}'
+            out_snapshots = f'{dir_snapshots}/{sub_folder}'
+            os.makedirs(out_features, exist_ok=True)
+            os.makedirs(out_latents, exist_ok=True)
+            os.makedirs(out_snapshots, exist_ok=True)
+        img = img.to(device)
+        c = c.to(device)
+        image_names = [f'{j:08d}' for j in range(i, i + batch)]
+        inversion(G, c, projector, img, num_steps, image_names, out_latents, out_features, out_snapshots, save_features_map=save_features_map, verbose=rank == 0)
+        i += batch
 
 
 @click.command()
@@ -69,6 +92,7 @@ def inversion(G: TriPlaneGenerator, c, projector, target, num_steps, image_names
 @click.option('--batch', type=int, help='batch size, used only with dataset', default=16, show_default=True)
 @click.option('--limit', type=int, help='limit images, used only with dataset', default=-1, show_default=True)
 @click.option('--save-features-map', type=bool, help='save features map', default=False, is_flag=True, show_default=True)
+@click.option('--gpus', type=int, help='number of GPU used, used only with dataset', default=1, show_default=True)
 def run(
         network_pkl: str,
         outdir: str,
@@ -82,7 +106,8 @@ def run(
         image_log_step: int,
         batch: int,
         limit: int,
-        save_features_map: bool
+        save_features_map: bool,
+        gpus: int
 ):
     """Render a latent vector interpolation video.
     Examples:
@@ -111,9 +136,9 @@ def run(
         G.neural_rendering_resolution = nrr
 
     projector = EG3DInverter(device=torch.device('cuda'), w_avg_samples=600, image_log_step=image_log_step, repeat_w=latent_space_type == 'w')
-    out_features = dir_features = f'{outdir}/features_maps'
-    out_latents = dir_latents = f'{outdir}/latents'
-    out_snapshots = dir_snapshots = f'{outdir}/snapshots'
+    out_features = f'{outdir}/features_maps'
+    out_latents = f'{outdir}/latents'
+    out_snapshots = f'{outdir}/snapshots'
     if dataset is None:
         image = Image.open(image_path).convert('RGB')
         image_name = os.path.basename(image_path)[:-4]
@@ -135,24 +160,14 @@ def run(
         inversion(G, c, projector, id_image[None], num_steps, [image_name], out_latents, out_features, out_snapshots, save_features_map=save_features_map)
     else:
         dataset = ImageFolderDataset(dataset, force_rgb=True, use_labels=True)
-        dataloader = DataLoader(dataset, batch_size=batch, shuffle=False, pin_memory=True)
-        i = 0
-        for img, c in dataloader:
-            if i >= limit > -1:
-                break
-            if i % 1000 == 0:
-                sub_folder = f'{i//1000:05d}'
-                out_features = f'{dir_features}/{sub_folder}'
-                out_latents = f'{dir_latents}/{sub_folder}'
-                out_snapshots = f'{dir_snapshots}/{sub_folder}'
-                os.makedirs(out_features, exist_ok=True)
-                os.makedirs(out_latents, exist_ok=True)
-                os.makedirs(out_snapshots, exist_ok=True)
-            img = img.to(device)
-            c = c.to(device)
-            image_names = [f'{j:08d}' for j in range(i, i+batch)]
-            inversion(G, c, projector, img, num_steps, image_names, out_latents, out_features, out_snapshots, save_features_map=save_features_map)
-            i += batch
+        nb_data = (len(dataset) if limit == -1 else min(limit, len(dataset)))
+        size_per_dataset = nb_data // gpus
+        sizes = [size_per_dataset for _ in range(gpus)]
+        sizes[-1] += nb_data % gpus
+        starts = [sum(sizes[:i]) for i in range(len(sizes))]
+        datasets = [Subset(dataset, range(start, start+size)) for start, size in zip(starts, sizes)]
+        torch.multiprocessing.set_start_method('spawn')
+        torch.multiprocessing.spawn(fn=subprocess_fn, args=(projector, G, num_steps, datasets, batch, out_latents, out_features, out_snapshots, save_features_map), nprocs=gpus)
 
 
 # ----------------------------------------------------------------------------

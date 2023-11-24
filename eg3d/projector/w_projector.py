@@ -72,7 +72,6 @@ class EG3DInverter:
         self.repeat_w = repeat_w
 
     def computeWStats(self, G, initial_w=None):
-        print(f'Computing W midpoint and stddev using {self.w_avg_samples} samples...')
         z_samples = np.random.RandomState(123).randn(self.w_avg_samples, G.z_dim)
 
         # use avg look at point
@@ -128,8 +127,8 @@ class EG3DInverter:
         ws = (w_opt + w_noise)
         return ws.repeat([1, G.backbone.mapping.num_ws, 1]) if self.repeat_w else ws
 
-    def loop(self, G, c, target_features, num_steps, image_names, optimizer, w_opt, w_std, noise_buffs, snapshots_outdir):
-        for step in tqdm(range(num_steps)):
+    def loop(self, G, c, target_features, num_steps, image_names, optimizer, w_opt, w_std, noise_buffs, snapshots_outdir, verbose: bool = True):
+        for step in tqdm(range(num_steps), disable=not verbose):
             ws = self.next_ws(G, step, num_steps, w_opt, w_std, optimizer)
             synth_images = G.synthesis(ws, c, noise_mode='const')['image']
 
@@ -177,6 +176,7 @@ class EG3DInverter:
                 snapshots_outdir: str,
                 num_steps: int = 1000,
                 initial_w=None,
+                verbose: bool = True
                 ):
         if self.image_log_step != 0:
             for img_name in image_names:
@@ -198,5 +198,5 @@ class EG3DInverter:
         optimizer = torch.optim.Adam([w_opt] + noise_buffs, betas=(0.9, 0.999), lr=0.1)
         noise_buffs = initNoises(noise_buffs)
 
-        self.loop(G, c, self.getFeatures(target), num_steps, image_names, optimizer, w_opt, w_std, noise_buffs, snapshots_outdir)
+        self.loop(G, c, self.getFeatures(target), num_steps, image_names, optimizer, w_opt, w_std, noise_buffs, snapshots_outdir, verbose)
         return w_opt.repeat([1, G.backbone.mapping.num_ws, 1]) if self.repeat_w else w_opt
