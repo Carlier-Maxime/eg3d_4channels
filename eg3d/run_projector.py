@@ -61,7 +61,8 @@ def subprocess_fn(rank, G, image_log_step, repeat_w, num_steps, datasets, batch,
     dir_snapshots = out_snapshots
     device = torch.device('cuda', rank)
     dataloader = DataLoader(datasets[rank], batch_size=batch, shuffle=False, pin_memory=True)
-    projector = EG3DInverter(device=torch.device('cuda'), w_avg_samples=600, image_log_step=image_log_step, repeat_w=repeat_w)
+    projector = EG3DInverter(device=device, w_avg_samples=600, image_log_step=image_log_step, repeat_w=repeat_w)
+    G = G.to(device)
     i = 0
     for img, c in dataloader:
         if i % 1000 == 0:
