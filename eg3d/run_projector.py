@@ -55,12 +55,13 @@ def inversion(G: TriPlaneGenerator, c, projector, target, num_steps, image_names
         np.save(f'{latents_outdir}/{file_basename}.npy', ws_)
 
 
-def subprocess_fn(rank, projector, G, num_steps, datasets, batch, out_latents, out_features, out_snapshots, save_features_map):
+def subprocess_fn(rank, G, image_log_step, repeat_w, num_steps, datasets, batch, out_latents, out_features, out_snapshots, save_features_map):
     dir_features = out_features
     dir_latents = out_latents
     dir_snapshots = out_snapshots
     device = torch.device('cuda', rank)
     dataloader = DataLoader(datasets[rank], batch_size=batch, shuffle=False, pin_memory=True)
+    projector = EG3DInverter(device=torch.device('cuda'), w_avg_samples=600, image_log_step=image_log_step, repeat_w=repeat_w)
     i = 0
     for img, c in dataloader:
         if i % 1000 == 0:
@@ -135,7 +136,6 @@ def run(
     if nrr is not None:
         G.neural_rendering_resolution = nrr
 
-    projector = EG3DInverter(device=torch.device('cuda'), w_avg_samples=600, image_log_step=image_log_step, repeat_w=latent_space_type == 'w')
     out_features = f'{outdir}/features_maps'
     out_latents = f'{outdir}/latents'
     out_snapshots = f'{outdir}/snapshots'
@@ -157,6 +157,7 @@ def run(
         from_im = (from_im - mean[:, None, None]) / std[:, None, None]
         from_im = torch.nn.functional.interpolate(from_im.unsqueeze(0), size=(512, 512), mode='bilinear', align_corners=False).squeeze(0)
         id_image = torch.squeeze((from_im + 1) / 2) * 255
+        projector = EG3DInverter(device=torch.device('cuda'), w_avg_samples=600, image_log_step=image_log_step, repeat_w=latent_space_type == 'w')
         inversion(G, c, projector, id_image[None], num_steps, [image_name], out_latents, out_features, out_snapshots, save_features_map=save_features_map)
     else:
         dataset = ImageFolderDataset(dataset, force_rgb=True, use_labels=True)
@@ -167,7 +168,7 @@ def run(
         starts = [sum(sizes[:i]) for i in range(len(sizes))]
         datasets = [Subset(dataset, range(start, start+size)) for start, size in zip(starts, sizes)]
         torch.multiprocessing.set_start_method('spawn')
-        torch.multiprocessing.spawn(fn=subprocess_fn, args=(projector, G, num_steps, datasets, batch, out_latents, out_features, out_snapshots, save_features_map), nprocs=gpus)
+        torch.multiprocessing.spawn(fn=subprocess_fn, args=(G, image_log_step, latent_space_type == 'w', num_steps, datasets, batch, out_latents, out_features, out_snapshots, save_features_map), nprocs=gpus)
 
 
 # ----------------------------------------------------------------------------
