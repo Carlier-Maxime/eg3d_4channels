@@ -21,6 +21,7 @@ from training.landmarkDetection import LandmarkDetector
 @click.option('--output', help='Where to save the results', metavar='DIR', default='output', show_default=True)
 @click.option('--device', help='device used for training', metavar='[cuda|cpu]', type=str, default='cuda', show_default=True)
 @click.option('--resume', help='resume from pth file', metavar='pth file', type=str, default=None, show_default=True)
+@click.option('--reduce-lr', help='reduce learning rate during training', type=bool, default=False, show_default=True, is_flag=True)
 def main(**kwargs):
     opts = EasyDict(kwargs)
     dataset = NumpyFolderDataset(opts.data)
@@ -51,18 +52,23 @@ def main(**kwargs):
     optimizer = optim.Adam(lmkDetector.parameters(), lr=opts.lr)
     pbar = tqdm(total=opts.epochs, desc='Training', unit='epochs')
     nb_epochs = 0
+    lr = opts.lr
     while nb_epochs < opts.epochs:
         for features_map, real_lmks in dataloader:
             real_lmks = real_lmks.to(opts.device).to(torch.float32)
             features_map = features_map.to(opts.device).to(torch.float32)
             lmks = lmkDetector(features_map)
             loss = criterion(1 + lmks, 1 + real_lmks)
-            pbar.set_postfix(loss=f'{float(loss)}')
+            pbar.set_postfix(lr=lr, loss=f'{float(loss)}')
             if tf_events is not None:
                 tf_events.add_scalar('Loss/Train', loss.item(), nb_epochs)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            if nb_epochs % 100 == 0 and nb_epochs > 0 and opts.reduce_lr:
+                for group in optimizer.param_groups:
+                    lr /= 10
+                    group['lr'] = lr
             nb_epochs += 1
             pbar.update(1)
             if nb_epochs == opts.epochs:
