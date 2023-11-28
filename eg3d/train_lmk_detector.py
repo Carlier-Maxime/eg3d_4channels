@@ -1,12 +1,15 @@
+import copy
 import os
 
 import click
 import torch.nn
+import pickle
 from torch import optim
 from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+import legacy
 from dnnlib import EasyDict
 from training.dataset import NumpyFolderDataset
 from training.landmarkDetection import LandmarkDetector
@@ -21,8 +24,9 @@ from training.landmarkDetection import LandmarkDetector
 # Optional
 @click.option('--output', help='Where to save the results', metavar='DIR', default='output', show_default=True)
 @click.option('--device', help='device used for training', metavar='[cuda|cpu]', type=str, default='cuda', show_default=True)
-@click.option('--resume', help='resume from pth file', metavar='pth file', type=str, default=None, show_default=True)
+@click.option('--resume', help='resume from pth or pkl file', metavar='[pth|pkl]', type=str, default=None, show_default=True)
 @click.option('--reduce-lr', help='reduce learning rate during training', type=click.Choice(['std', 'exp']), default=None, show_default=True)
+@click.option('--to-pth', help='save a network to pth file', type=bool, is_flag=True, default=False, show_default=True)
 def main(**kwargs):
     opts = EasyDict(kwargs)
     dataset = NumpyFolderDataset(opts.data)
@@ -32,8 +36,12 @@ def main(**kwargs):
     print(" Done")
     if opts.resume is not None:
         print(f"Resume from {opts.resume}...", end="")
-        w = torch.load(opts.resume)
-        lmkDetector.load_state_dict(w)
+        if opts.resume.endswith('.pth'):
+            w = torch.load(opts.resume)
+            lmkDetector.load_state_dict(w)
+        else:
+            with open(opts.resume, 'rb') as f:
+                lmkDetector = legacy.load_network_pkl(f).to(opts.device)
         print(" Done")
     try:
         import torch.utils.tensorboard as tensorboard
@@ -87,7 +95,11 @@ def main(**kwargs):
     if opts.resume is not None:
         resume = opts.resume.split("lmkDetector-")[1].split(".pth")[0].split("-")[0]
         fname += f'-resume-{resume}'
-    torch.save(lmkDetector.state_dict(), f'{fname}.pth')
+    if opts.to_pth:
+        torch.save(lmkDetector.state_dict(), f'{fname}.pth')
+    else:
+        with open(f"{fname}.pkl", 'wb') as f:
+            pickle.dump(copy.deepcopy(lmkDetector).eval().requires_grad_(False).cpu(), f)
 
 
 if __name__ == '__main__':
