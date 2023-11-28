@@ -31,17 +31,19 @@ def main(**kwargs):
     opts = EasyDict(kwargs)
     dataset = NumpyFolderDataset(opts.data)
     dataloader = DataLoader(dataset, batch_size=opts.batch, shuffle=True, pin_memory=True)
-    print("Create Network...", end='')
-    lmkDetector = LandmarkDetector(105, 256, 96).to(opts.device)
-    print(" Done")
     if opts.resume is not None:
         print(f"Resume from {opts.resume}...", end="")
         if opts.resume.endswith('.pth'):
+            lmkDetector = LandmarkDetector(105, 256, 96).to(opts.device)
             w = torch.load(opts.resume)
             lmkDetector.load_state_dict(w)
         else:
             with open(opts.resume, 'rb') as f:
                 lmkDetector = legacy.load_network_pkl(f).to(opts.device)
+        print(" Done")
+    else:
+        print("Create Network...", end='')
+        lmkDetector = LandmarkDetector(105, 256, 96).to(opts.device)
         print(" Done")
     try:
         import torch.utils.tensorboard as tensorboard
