@@ -72,7 +72,7 @@ def main(**kwargs):
             real_lmks = real_lmks.to(opts.device).to(torch.float32)
             features_map = features_map.to(opts.device).to(torch.float32)
             lmks = lmkDetector(features_map)
-            loss = criterion(1 + lmks, 1 + real_lmks)
+            loss = criterion(lmks, real_lmks)
             pbar.set_postfix(lr=f'{optimizer.param_groups[0]['lr']:.2e}', loss=f'{float(loss):.2e}')
             if tf_events is not None:
                 tf_events.add_scalar('Loss/Train', loss.item(), nb_epochs)
