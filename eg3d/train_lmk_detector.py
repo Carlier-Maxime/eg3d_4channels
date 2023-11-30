@@ -9,7 +9,6 @@ from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-import legacy
 from dnnlib import EasyDict
 from training.dataset import NumpyFolderDataset
 from training.landmarkDetection import LandmarkDetector
@@ -39,7 +38,7 @@ def main(**kwargs):
             lmkDetector.load_state_dict(w)
         else:
             with open(opts.resume, 'rb') as f:
-                lmkDetector = legacy.load_network_pkl(f).to(opts.device)
+                lmkDetector = pickle.Unpickler(f).load().to(opts.device)
         print(" Done")
     else:
         print("Create Network...", end='')
