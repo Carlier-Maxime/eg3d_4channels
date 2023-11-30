@@ -1,3 +1,5 @@
+import pickle
+
 import click
 import numpy as np
 import torch
@@ -17,9 +19,13 @@ def main(**kwargs):
     opts = EasyDict(kwargs)
     features = torch.from_numpy(np.load(opts.features)).to(opts.device)
     print("Load Network...", end='')
-    lmkDetector = LandmarkDetector(105, 256, 96).to(opts.device)
-    w = torch.load(opts.network)
-    lmkDetector.load_state_dict(w)
+    if opts.network.endswith('.pth'):
+        lmkDetector = LandmarkDetector(105, 256, 96).to(opts.device)
+        w = torch.load(opts.network)
+        lmkDetector.load_state_dict(w)
+    else:
+        with open(opts.network, 'rb') as f:
+            lmkDetector = pickle.Unpickler(f).load().to(opts.device)
     print(" Done")
     print("Generate results...", end='')
     with torch.no_grad():
