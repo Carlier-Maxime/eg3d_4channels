@@ -55,7 +55,7 @@ def inversion(G: TriPlaneGenerator, c, projector, target, num_steps, image_names
         np.save(f'{latents_outdir}/{file_basename}.npy', ws_)
 
 
-def subprocess_fn(rank, G, image_log_step, repeat_w, num_steps, datasets, batch, out_latents, out_features, out_snapshots, save_features_map):
+def subprocess_fn(rank, G, image_log_step, repeat_w, num_steps, datasets, batch, out_latents, out_features, out_snapshots, save_features_map, starts_index):
     dir_features = out_features
     dir_latents = out_latents
     dir_snapshots = out_snapshots
@@ -63,7 +63,7 @@ def subprocess_fn(rank, G, image_log_step, repeat_w, num_steps, datasets, batch,
     dataloader = DataLoader(datasets[rank], batch_size=batch, shuffle=False, pin_memory=True)
     projector = EG3DInverter(device=device, w_avg_samples=600, image_log_step=image_log_step, repeat_w=repeat_w)
     G = G.to(device)
-    i = 0
+    i = starts_index[rank]
     for img, c in dataloader:
         if i % 1000 == 0:
             sub_folder = f'{i // 1000:05d}'
@@ -169,7 +169,7 @@ def run(
         starts = [sum(sizes[:i]) for i in range(len(sizes))]
         datasets = [Subset(dataset, range(start, start+size)) for start, size in zip(starts, sizes)]
         torch.multiprocessing.set_start_method('spawn')
-        torch.multiprocessing.spawn(fn=subprocess_fn, args=(G, image_log_step, latent_space_type == 'w', num_steps, datasets, batch, out_latents, out_features, out_snapshots, save_features_map), nprocs=gpus)
+        torch.multiprocessing.spawn(fn=subprocess_fn, args=(G, image_log_step, latent_space_type == 'w', num_steps, datasets, batch, out_latents, out_features, out_snapshots, save_features_map, starts), nprocs=gpus)
 
 
 # ----------------------------------------------------------------------------
