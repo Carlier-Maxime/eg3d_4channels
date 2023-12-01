@@ -224,7 +224,7 @@ class AugmentPipe(torch.nn.Module):
             i = torch.floor(torch.rand([batch_size], device=device) * 2)
             i = torch.where(torch.lt(torch.rand([batch_size], device=device), self.xflip * self.p), i, torch.zeros_like(i))
             if debug_percentile is not None:
-                i = torch.full_like(i, torch.floor(debug_percentile * 2))
+                i = torch.full_like(i, torch.floor(debug_percentile * 2).item())
             G_inv = G_inv @ scale2d_inv(1 - 2 * i, 1)
 
         # Apply 90 degree rotations with probability (rotate90 * strength).
@@ -232,7 +232,7 @@ class AugmentPipe(torch.nn.Module):
             i = torch.floor(torch.rand([batch_size], device=device) * 4)
             i = torch.where(torch.lt(torch.rand([batch_size], device=device), self.rotate90 * self.p), i, torch.zeros_like(i))
             if debug_percentile is not None:
-                i = torch.full_like(i, torch.floor(debug_percentile * 4))
+                i = torch.full_like(i, torch.floor(debug_percentile * 4).item())
             G_inv = G_inv @ rotate2d_inv(-np.pi / 2 * i)
 
         # Apply integer translation with probability (xint * strength).
@@ -252,7 +252,7 @@ class AugmentPipe(torch.nn.Module):
             s = torch.exp2(torch.randn([batch_size], device=device) * self.scale_std)
             s = torch.where(torch.lt(torch.rand([batch_size], device=device), self.scale * self.p), s, torch.ones_like(s))
             if debug_percentile is not None:
-                s = torch.full_like(s, torch.exp2(torch.erfinv(debug_percentile * 2 - 1) * self.scale_std))
+                s = torch.full_like(s, torch.exp2(torch.erfinv(debug_percentile * 2 - 1) * self.scale_std).item())
             G_inv = G_inv @ scale2d_inv(s, s)
 
         # Apply pre-rotation with probability p_rot.
@@ -269,7 +269,7 @@ class AugmentPipe(torch.nn.Module):
             s = torch.exp2(torch.randn([batch_size], device=device) * self.aniso_std)
             s = torch.where(torch.lt(torch.rand([batch_size], device=device), self.aniso * self.p), s, torch.ones_like(s))
             if debug_percentile is not None:
-                s = torch.full_like(s, torch.exp2(torch.erfinv(debug_percentile * 2 - 1) * self.aniso_std))
+                s = torch.full_like(s, torch.exp2(torch.erfinv(debug_percentile * 2 - 1) * self.aniso_std).item())
             G_inv = G_inv @ scale2d_inv(s, 1 / s)
 
         # Apply post-rotation with probability p_rot.
@@ -346,7 +346,7 @@ class AugmentPipe(torch.nn.Module):
             c = torch.exp2(torch.randn([batch_size], device=device) * self.contrast_std)
             c = torch.where(torch.lt(torch.rand([batch_size], device=device), self.contrast * self.p), c, torch.ones_like(c))
             if debug_percentile is not None:
-                c = torch.full_like(c, torch.exp2(torch.erfinv(debug_percentile * 2 - 1) * self.contrast_std))
+                c = torch.full_like(c, torch.exp2(torch.erfinv(debug_percentile * 2 - 1) * self.contrast_std).item())
             C = scale3d(c, c, c) @ C
 
         # Apply luma flip with probability (lumaflip * strength).
@@ -355,7 +355,7 @@ class AugmentPipe(torch.nn.Module):
             i = torch.floor(torch.rand([batch_size, 1, 1], device=device) * 2)
             i = torch.where(torch.lt(torch.rand([batch_size, 1, 1], device=device), self.lumaflip * self.p), i, torch.zeros_like(i))
             if debug_percentile is not None:
-                i = torch.full_like(i, torch.floor(debug_percentile * 2))
+                i = torch.full_like(i, torch.floor(debug_percentile * 2).item())
             C = (I_4 - 2 * v.ger(v) * i) @ C  # Householder reflection.
 
         # Apply hue rotation with probability (hue * strength).
@@ -371,7 +371,7 @@ class AugmentPipe(torch.nn.Module):
             s = torch.exp2(torch.randn([batch_size, 1, 1], device=device) * self.saturation_std)
             s = torch.where(torch.lt(torch.rand([batch_size, 1, 1], device=device), self.saturation * self.p), s, torch.ones_like(s))
             if debug_percentile is not None:
-                s = torch.full_like(s, torch.exp2(torch.erfinv(debug_percentile * 2 - 1) * self.saturation_std))
+                s = torch.full_like(s, torch.exp2(torch.erfinv(debug_percentile * 2 - 1) * self.saturation_std).item())
             C = (v.ger(v) + (I_4 - v.ger(v)) * s) @ C
 
         # ------------------------------
@@ -408,7 +408,7 @@ class AugmentPipe(torch.nn.Module):
                 t_i = torch.exp2(torch.randn([batch_size], device=device) * self.imgfilter_std)
                 t_i = torch.where(torch.lt(torch.rand([batch_size], device=device), self.imgfilter * self.p * band_strength), t_i, torch.ones_like(t_i))
                 if debug_percentile is not None:
-                    t_i = torch.full_like(t_i, torch.exp2(torch.erfinv(debug_percentile * 2 - 1) * self.imgfilter_std)) if band_strength > 0 else torch.ones_like(t_i)
+                    t_i = torch.full_like(t_i, torch.exp2(torch.erfinv(debug_percentile * 2 - 1) * self.imgfilter_std).item()) if band_strength > 0 else torch.ones_like(t_i)
                 t = torch.ones([batch_size, num_bands], device=device)  # Temporary gain vector.
                 t[:, i] = t_i  # Replace i'th element.
                 t = t / (expected_power * t.square()).sum(dim=-1, keepdims=True).sqrt()  # Normalize power.
@@ -446,7 +446,7 @@ class AugmentPipe(torch.nn.Module):
             center = torch.rand([batch_size, 2, 1, 1, 1], device=device)
             if debug_percentile is not None:
                 size = torch.full_like(size, self.cutout_size)
-                center = torch.full_like(center, debug_percentile)
+                center = torch.full_like(center, debug_percentile.item())
             coord_x = torch.arange(width, device=device).reshape([1, 1, 1, -1])
             coord_y = torch.arange(height, device=device).reshape([1, 1, -1, 1])
             mask_x = (((coord_x + 0.5) / width - center[:, 0]).abs() >= size[:, 0] / 2)
