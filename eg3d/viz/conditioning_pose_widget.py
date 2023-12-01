@@ -8,8 +8,8 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
-import numpy as np
 import imgui
+
 import dnnlib
 from gui_utils import imgui_utils
 
