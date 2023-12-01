@@ -280,7 +280,7 @@ def main(**kwargs):
     else:
         assert False, f"Unsupported resolution {c.training_set_kwargs.resolution}; make a new superresolution module"
 
-    if opts.sr_module != None:
+    if opts.sr_module is not None:
         sr_module = opts.sr_module
 
     rendering_options = {
