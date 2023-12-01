@@ -14,7 +14,7 @@ Matches the original implementation by Karras et al. at
 https://github.com/NVlabs/stylegan2-ada/blob/main/training/augment.py"""
 
 import numpy as np
-import scipy.signal
+import scipy
 import torch
 from torch_utils import persistence
 from torch_utils import misc
