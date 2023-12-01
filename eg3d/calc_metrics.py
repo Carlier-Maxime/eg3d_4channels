@@ -13,7 +13,6 @@
 import os
 import click
 import json
-import tempfile
 import copy
 import torch
 
@@ -21,7 +20,7 @@ import dnnlib
 import legacy
 from metrics import metric_main
 from metrics import metric_utils
-from torch_utils import training_stats
+from torch_utils.multiprocessing import launch_multiprocessing, init_distributed
 from torch_utils import custom_ops
 from torch_utils import misc
 from torch_utils.ops import conv2d_gradfix
@@ -32,19 +31,7 @@ from torch_utils.ops import conv2d_gradfix
 def subprocess_fn(rank, args, temp_dir):
     dnnlib.util.Logger(should_flush=True)
 
-    # Init torch.distributed.
-    if args.num_gpus > 1:
-        init_file = os.path.abspath(os.path.join(temp_dir, '.torch_distributed_init'))
-        if os.name == 'nt':
-            init_method = 'file:///' + init_file.replace('\\', '/')
-            torch.distributed.init_process_group(backend='gloo', init_method=init_method, rank=rank, world_size=args.num_gpus)
-        else:
-            init_method = f'file://{init_file}'
-            torch.distributed.init_process_group(backend='nccl', init_method=init_method, rank=rank, world_size=args.num_gpus)
-
-    # Init torch_utils.
-    sync_device = torch.device('cuda', rank) if args.num_gpus > 1 else None
-    training_stats.init_multiprocessing(rank=rank, sync_device=sync_device)
+    init_distributed(rank, temp_dir, args)
     if rank != 0 or not args.verbose:
         custom_ops.verbosity = 'none'
 
@@ -106,10 +93,10 @@ def calc_metrics(ctx, network_pkl, metrics, data, mirror, gpus, verbose):
     \b
     # Previous training run: look up options automatically, save result to JSONL file.
     python calc_metrics.py --metrics=eqt50k_int,eqr50k \\
-        --network=~/training-runs/00000-stylegan3-r-mydataset/network-snapshot-000000.pkl
+        --network=~/training-runs/00000-stylegan3-r-my_dataset/network-snapshot-000000.pkl
 
     \b
-    # Pre-trained network pickle: specify dataset explicitly, print result to stdout.
+    # Pretrained network pickle: specify dataset explicitly, print result to stdout.
     python calc_metrics.py --metrics=fid50k_full --data=~/datasets/ffhq-1024x1024.zip --mirror=1 \\
         --network=https://api.ngc.nvidia.com/v2/models/nvidia/research/stylegan3/versions/1/files/stylegan3-t-ffhq-1024x1024.pkl
 
@@ -117,7 +104,7 @@ def calc_metrics(ctx, network_pkl, metrics, data, mirror, gpus, verbose):
     Recommended metrics:
       fid50k_full  Frechet inception distance against the full dataset.
       kid50k_full  Kernel inception distance against the full dataset.
-      pr50k3_full  Precision and recall againt the full dataset.
+      pr50k3_full  Precision and recall against the full dataset.
       ppl2_wend    Perceptual path length in W, endpoints, full image.
       eqt50k_int   Equivariance w.r.t. integer translation (EQ-T).
       eqt50k_frac  Equivariance w.r.t. fractional translation (EQ-T_frac).
@@ -177,12 +164,7 @@ def calc_metrics(ctx, network_pkl, metrics, data, mirror, gpus, verbose):
     # Launch processes.
     if args.verbose:
         print('Launching processes...')
-    torch.multiprocessing.set_start_method('spawn')
-    with tempfile.TemporaryDirectory() as temp_dir:
-        if args.num_gpus == 1:
-            subprocess_fn(rank=0, args=args, temp_dir=temp_dir)
-        else:
-            torch.multiprocessing.spawn(fn=subprocess_fn, args=(args, temp_dir), nprocs=args.num_gpus)
+    launch_multiprocessing(subprocess_fn, args)
 
 
 # ----------------------------------------------------------------------------

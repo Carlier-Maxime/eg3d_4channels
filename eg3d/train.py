@@ -18,13 +18,11 @@ import os
 import click
 import re
 import json
-import tempfile
-import torch
 
 import dnnlib
+from torch_utils.multiprocessing import launch_multiprocessing, init_distributed
 from training import training_loop
 from metrics import metric_main
-from torch_utils import training_stats
 from torch_utils import custom_ops
 
 
@@ -33,19 +31,7 @@ from torch_utils import custom_ops
 def subprocess_fn(rank, c, temp_dir):
     dnnlib.util.Logger(file_name=os.path.join(c.run_dir, 'log.txt'), file_mode='a', should_flush=True)
 
-    # Init torch.distributed.
-    if c.num_gpus > 1:
-        init_file = os.path.abspath(os.path.join(temp_dir, '.torch_distributed_init'))
-        if os.name == 'nt':
-            init_method = 'file:///' + init_file.replace('\\', '/')
-            torch.distributed.init_process_group(backend='gloo', init_method=init_method, rank=rank, world_size=c.num_gpus)
-        else:
-            init_method = f'file://{init_file}'
-            torch.distributed.init_process_group(backend='nccl', init_method=init_method, rank=rank, world_size=c.num_gpus)
-
-    # Init torch_utils.
-    sync_device = torch.device('cuda', rank) if c.num_gpus > 1 else None
-    training_stats.init_multiprocessing(rank=rank, sync_device=sync_device)
+    init_distributed(rank, temp_dir, c)
     if rank != 0:
         custom_ops.verbosity = 'none'
 
@@ -97,12 +83,7 @@ def launch_training(c, desc, outdir, dry_run):
 
     # Launch processes.
     print('Launching processes...')
-    torch.multiprocessing.set_start_method('spawn')
-    with tempfile.TemporaryDirectory() as temp_dir:
-        if c.num_gpus == 1:
-            subprocess_fn(rank=0, c=c, temp_dir=temp_dir)
-        else:
-            torch.multiprocessing.spawn(fn=subprocess_fn, args=(c, temp_dir), nprocs=c.num_gpus)
+    launch_multiprocessing(subprocess_fn, c)
 
 
 # ----------------------------------------------------------------------------
