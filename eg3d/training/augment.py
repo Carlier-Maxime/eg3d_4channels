@@ -104,11 +104,11 @@ def rotate2d(theta, **kwargs):
 
 
 def rotate3d(v, theta, **kwargs):
-    vx = v[..., 0];
-    vy = v[..., 1];
+    vx = v[..., 0]
+    vy = v[..., 1]
     vz = v[..., 2]
-    s = torch.sin(theta);
-    c = torch.cos(theta);
+    s = torch.sin(theta)
+    c = torch.cos(theta)
     cc = 1 - c
     return matrix(
         [vx * vx * cc + c, vx * vy * cc - vz * s, vx * vz * cc + vy * s, 0],
@@ -143,10 +143,12 @@ class AugmentPipe(torch.nn.Module):
                  xflip=0, rotate90=0, xint=0, xint_max=0.125,
                  scale=0, rotate=0, aniso=0, xfrac=0, scale_std=0.2, rotate_max=1, aniso_std=0.2, xfrac_std=0.125,
                  brightness=0, contrast=0, lumaflip=0, hue=0, saturation=0, brightness_std=0.2, contrast_std=0.5, hue_max=1, saturation_std=1,
-                 imgfilter=0, imgfilter_bands=[1, 1, 1, 1], imgfilter_std=1,
+                 imgfilter=0, imgfilter_bands=None, imgfilter_std=1,
                  noise=0, cutout=0, noise_std=0.1, cutout_size=0.5,
                  ):
         super().__init__()
+        if imgfilter_bands is None:
+            imgfilter_bands = [1, 1, 1, 1]
         self.register_buffer('p', torch.ones([]))  # Overall multiplier for augmentation probability.
 
         # Pixel blitting.
