@@ -15,9 +15,25 @@ Helper functions for constructing camera parameter matrices. Primarily used in v
 import math
 
 import torch
-import torch.nn as nn
 
 from training.volumetric_rendering import math_utils
+
+
+def poseSampling(horizontal_mean, vertical_mean, horizontal_stddev=0, vertical_stddev=0, radius=1, batch_size=1, device='cpu'):
+    h = torch.randn((batch_size, 1), device=device) * horizontal_stddev + horizontal_mean
+    v = torch.randn((batch_size, 1), device=device) * vertical_stddev + vertical_mean
+    v = torch.clamp(v, 1e-5, math.pi - 1e-5)
+
+    theta = h
+    v = v / math.pi
+    phi = torch.arccos(1 - 2 * v)
+
+    camera_origins = torch.zeros((batch_size, 3), device=device)
+
+    camera_origins[:, 0:1] = radius * torch.sin(phi) * torch.cos(math.pi - theta)
+    camera_origins[:, 2:3] = radius * torch.sin(phi) * torch.sin(math.pi - theta)
+    camera_origins[:, 1:2] = radius * torch.cos(phi)
+    return camera_origins
 
 
 class GaussianCameraPoseSampler:
@@ -27,8 +43,8 @@ class GaussianCameraPoseSampler:
     If horizontal and vertical stddev (specified in radians) are zero, gives a
     deterministic camera pose with yaw=horizontal_mean, pitch=vertical_mean.
     The coordinate system is specified with y-up, z-forward, x-left.
-    Horizontal mean is the azimuthal angle (rotation around y axis) in radians,
-    vertical mean is the polar angle (angle from the y axis) in radians.
+    Horizontal mean is the azimuthal angle (rotation around y-axis) in radians,
+    vertical mean is the polar angle (angle from the y-axis) in radians.
     A point along the z-axis has azimuthal_angle=0, polar_angle=pi/2.
 
     Example:
@@ -38,20 +54,7 @@ class GaussianCameraPoseSampler:
 
     @staticmethod
     def sample(horizontal_mean, vertical_mean, horizontal_stddev=0, vertical_stddev=0, radius=1, batch_size=1, device='cpu'):
-        h = torch.randn((batch_size, 1), device=device) * horizontal_stddev + horizontal_mean
-        v = torch.randn((batch_size, 1), device=device) * vertical_stddev + vertical_mean
-        v = torch.clamp(v, 1e-5, math.pi - 1e-5)
-
-        theta = h
-        v = v / math.pi
-        phi = torch.arccos(1 - 2 * v)
-
-        camera_origins = torch.zeros((batch_size, 3), device=device)
-
-        camera_origins[:, 0:1] = radius * torch.sin(phi) * torch.cos(math.pi - theta)
-        camera_origins[:, 2:3] = radius * torch.sin(phi) * torch.sin(math.pi - theta)
-        camera_origins[:, 1:2] = radius * torch.cos(phi)
-
+        camera_origins = poseSampling(horizontal_mean, vertical_mean, horizontal_stddev, vertical_stddev, radius, batch_size, device)
         forward_vectors = math_utils.normalize_vecs(-camera_origins)
         return create_cam2world_matrix(forward_vectors, camera_origins)
 
@@ -68,21 +71,7 @@ class LookAtPoseSampler:
 
     @staticmethod
     def sample(horizontal_mean, vertical_mean, lookat_position, horizontal_stddev=0, vertical_stddev=0, radius=1, batch_size=1, device='cpu'):
-        h = torch.randn((batch_size, 1), device=device) * horizontal_stddev + horizontal_mean
-        v = torch.randn((batch_size, 1), device=device) * vertical_stddev + vertical_mean
-        v = torch.clamp(v, 1e-5, math.pi - 1e-5)
-
-        theta = h
-        v = v / math.pi
-        phi = torch.arccos(1 - 2 * v)
-
-        camera_origins = torch.zeros((batch_size, 3), device=device)
-
-        camera_origins[:, 0:1] = radius * torch.sin(phi) * torch.cos(math.pi - theta)
-        camera_origins[:, 2:3] = radius * torch.sin(phi) * torch.sin(math.pi - theta)
-        camera_origins[:, 1:2] = radius * torch.cos(phi)
-
-        # forward_vectors = math_utils.normalize_vecs(-camera_origins)
+        camera_origins = poseSampling(horizontal_mean, vertical_mean, horizontal_stddev, vertical_stddev, radius, batch_size, device)
         forward_vectors = math_utils.normalize_vecs(lookat_position - camera_origins)
         return create_cam2world_matrix(forward_vectors, camera_origins)
 
@@ -100,20 +89,7 @@ class UniformCameraPoseSampler:
 
     @staticmethod
     def sample(horizontal_mean, vertical_mean, horizontal_stddev=0, vertical_stddev=0, radius=1, batch_size=1, device='cpu'):
-        h = (torch.rand((batch_size, 1), device=device) * 2 - 1) * horizontal_stddev + horizontal_mean
-        v = (torch.rand((batch_size, 1), device=device) * 2 - 1) * vertical_stddev + vertical_mean
-        v = torch.clamp(v, 1e-5, math.pi - 1e-5)
-
-        theta = h
-        v = v / math.pi
-        phi = torch.arccos(1 - 2 * v)
-
-        camera_origins = torch.zeros((batch_size, 3), device=device)
-
-        camera_origins[:, 0:1] = radius * torch.sin(phi) * torch.cos(math.pi - theta)
-        camera_origins[:, 2:3] = radius * torch.sin(phi) * torch.sin(math.pi - theta)
-        camera_origins[:, 1:2] = radius * torch.cos(phi)
-
+        camera_origins = poseSampling(horizontal_mean-horizontal_stddev, vertical_mean-vertical_stddev, horizontal_stddev*2, vertical_stddev*2, radius, batch_size, device)
         forward_vectors = math_utils.normalize_vecs(-camera_origins)
         return create_cam2world_matrix(forward_vectors, camera_origins)
 
@@ -131,7 +107,7 @@ def create_cam2world_matrix(forward_vector, origin):
     up_vector = math_utils.normalize_vecs(torch.cross(forward_vector, right_vector, dim=-1))
 
     rotation_matrix = torch.eye(4, device=origin.device).unsqueeze(0).repeat(forward_vector.shape[0], 1, 1)
-    rotation_matrix[:, :3, :3] = torch.stack((right_vector, up_vector, forward_vector), axis=-1)
+    rotation_matrix[:, :3, :3] = torch.stack((right_vector, up_vector, forward_vector), dim=-1)
 
     translation_matrix = torch.eye(4, device=origin.device).unsqueeze(0).repeat(forward_vector.shape[0], 1, 1)
     translation_matrix[:, :3, 3] = origin
