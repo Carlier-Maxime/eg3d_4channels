@@ -204,6 +204,13 @@ class AugmentPipe(torch.nn.Module):
             Hz_fbank[i, (Hz_fbank.shape[1] - Hz_hi2.size) // 2: (Hz_fbank.shape[1] + Hz_hi2.size) // 2] += Hz_hi2
         self.register_buffer('Hz_fbank', torch.as_tensor(Hz_fbank, dtype=torch.float32))
 
+    def prepare_geometric_transformation_exp2(self, val, std, debug_percentile, batch_size, device):
+        s = torch.exp2(torch.randn([batch_size], device=device) * std)
+        s = torch.where(torch.lt(torch.rand([batch_size], device=device), val * self.p), s, torch.ones_like(s))
+        if debug_percentile is not None:
+            s = torch.full_like(s, torch.exp2(torch.erfinv(debug_percentile * 2 - 1) * std).item())
+        return s
+
     def forward(self, images, debug_percentile=None):
         assert isinstance(images, torch.Tensor) and images.ndim == 4
         batch_size, num_channels, height, width = images.shape
@@ -249,10 +256,7 @@ class AugmentPipe(torch.nn.Module):
 
         # Apply isotropic scaling with probability (scale * strength).
         if self.scale > 0:
-            s = torch.exp2(torch.randn([batch_size], device=device) * self.scale_std)
-            s = torch.where(torch.lt(torch.rand([batch_size], device=device), self.scale * self.p), s, torch.ones_like(s))
-            if debug_percentile is not None:
-                s = torch.full_like(s, torch.exp2(torch.erfinv(debug_percentile * 2 - 1) * self.scale_std).item())
+            s = self.prepare_geometric_transformation_exp2(self.scale, self.scale_std, debug_percentile, batch_size, device)
             G_inv = G_inv @ scale2d_inv(s, s)
 
         # Apply pre-rotation with probability p_rot.
@@ -266,10 +270,7 @@ class AugmentPipe(torch.nn.Module):
 
         # Apply anisotropic scaling with probability (aniso * strength).
         if self.aniso > 0:
-            s = torch.exp2(torch.randn([batch_size], device=device) * self.aniso_std)
-            s = torch.where(torch.lt(torch.rand([batch_size], device=device), self.aniso * self.p), s, torch.ones_like(s))
-            if debug_percentile is not None:
-                s = torch.full_like(s, torch.exp2(torch.erfinv(debug_percentile * 2 - 1) * self.aniso_std).item())
+            s = self.prepare_geometric_transformation_exp2(self.aniso, self.aniso_std, debug_percentile, batch_size, device)
             G_inv = G_inv @ scale2d_inv(s, 1 / s)
 
         # Apply post-rotation with probability p_rot.
@@ -343,10 +344,7 @@ class AugmentPipe(torch.nn.Module):
 
         # Apply contrast with probability (contrast * strength).
         if self.contrast > 0:
-            c = torch.exp2(torch.randn([batch_size], device=device) * self.contrast_std)
-            c = torch.where(torch.lt(torch.rand([batch_size], device=device), self.contrast * self.p), c, torch.ones_like(c))
-            if debug_percentile is not None:
-                c = torch.full_like(c, torch.exp2(torch.erfinv(debug_percentile * 2 - 1) * self.contrast_std).item())
+            c = self.prepare_geometric_transformation_exp2(self.contrast, self.contrast_std, debug_percentile, batch_size, device)
             C = scale3d(c, c, c) @ C
 
         # Apply luma flip with probability (lumaflip * strength).
