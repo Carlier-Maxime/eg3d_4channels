@@ -8,24 +8,17 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
-import numpy as np
 import imgui
+
 import dnnlib
 from gui_utils import imgui_utils
 
 
-# ----------------------------------------------------------------------------
-
-class PoseWidget:
+class BasePoseWidget:
     def __init__(self, viz):
         self.viz = viz
         self.pose = dnnlib.EasyDict(yaw=0, pitch=0, anim=False, speed=0.25)
         self.pose_def = dnnlib.EasyDict(self.pose)
-
-        self.lookat_point_choice = 0
-        self.lookat_point_option = ['auto', 'ffhq', 'shapenet', 'afhq', 'manual']
-        self.lookat_point_labels = ['Auto Detect', 'FFHQ Default', 'Shapenet Default', 'AFHQ Default', 'Manual']
-        self.lookat_point = (0.0, 0.0, 0.2)
 
     def drag(self, dx, dy):
         viz = self.viz
@@ -33,15 +26,15 @@ class PoseWidget:
         self.pose.pitch += -dy / viz.font_size * 3e-2
 
     @imgui_utils.scoped_by_object_id
-    def __call__(self, show=True):
+    def __call__(self, name: str, input_name: str, show: bool = True):
         viz = self.viz
         if show:
-            imgui.text('Pose')
+            imgui.text(name)
             imgui.same_line(viz.label_w)
             yaw = self.pose.yaw
             pitch = self.pose.pitch
             with imgui_utils.item_width(viz.font_size * 5):
-                changed, (new_yaw, new_pitch) = imgui.input_float2('##pose', yaw, pitch, format='%+.2f', flags=imgui.INPUT_TEXT_ENTER_RETURNS_TRUE)
+                changed, (new_yaw, new_pitch) = imgui.input_float2(input_name, yaw, pitch, format='%+.2f', flags=imgui.INPUT_TEXT_ENTER_RETURNS_TRUE)
                 if changed:
                     self.pose.yaw = new_yaw
                     self.pose.pitch = new_pitch
@@ -57,23 +50,36 @@ class PoseWidget:
             if imgui_utils.button('Reset', width=-1, enabled=(self.pose != self.pose_def)):
                 self.pose = dnnlib.EasyDict(self.pose_def)
 
-            # New line starts here
+
+# ----------------------------------------------------------------------------
+
+class PoseWidget(BasePoseWidget):
+    def __init__(self, viz):
+        super().__init__(viz)
+        self.lookat_point_choice = 0
+        self.lookat_point_option = ['auto', 'ffhq', 'shapenet', 'afhq', 'manual']
+        self.lookat_point_labels = ['Auto Detect', 'FFHQ Default', 'Shapenet Default', 'AFHQ Default', 'Manual']
+        self.lookat_point = (0.0, 0.0, 0.2)
+
+    @imgui_utils.scoped_by_object_id
+    def __call__(self, show=True):
+        viz = self.viz
+        super().__call__('Pose', '##pose', show=show)
+        if show:
             imgui.text('LookAt Point')
             imgui.same_line(viz.label_w)
             with imgui_utils.item_width(viz.font_size * 8):
                 _clicked, self.lookat_point_choice = imgui.combo('', self.lookat_point_choice, self.lookat_point_labels)
             lookat_point = self.lookat_point_option[self.lookat_point_choice]
+            changes_enabled = False
             if lookat_point == 'auto':
                 self.lookat_point = None
             if lookat_point == 'ffhq':
                 self.lookat_point = (0.0, 0.0, 0.2)
-                changes_enabled = False
             if lookat_point == 'shapenet':
                 self.lookat_point = (0.0, 0.0, 0.0)
-                changes_enabled = False
             if lookat_point == 'afhq':
                 self.lookat_point = (0.0, 0.0, 0.0)
-                changes_enabled = False
             if lookat_point == 'manual':
                 if self.lookat_point is None:
                     self.lookat_point = (0.0, 0.0, 0.0)
@@ -86,7 +92,6 @@ class PoseWidget:
 
         viz.args.yaw = self.pose.yaw
         viz.args.pitch = self.pose.pitch
-
         viz.args.lookat_point = self.lookat_point
 
 # ----------------------------------------------------------------------------
