@@ -94,16 +94,23 @@ def bias_act(x, b=None, dim=1, act='linear', alpha=None, gain=None, clamp=None, 
 
 # ----------------------------------------------------------------------------
 
+def _parse_arguments(spec, alpha=None, gain=None, clamp=None):
+    assert clamp is None or clamp >= 0
+    alpha = float(alpha if alpha is not None else spec.def_alpha)
+    gain = float(gain if gain is not None else spec.def_gain)
+    clamp = float(clamp if clamp is not None else -1)
+    return alpha, gain, clamp
+
+
+# ----------------------------------------------------------------------------
+
 @misc.profiled_function
 def _bias_act_ref(x, b=None, dim=1, act='linear', alpha=None, gain=None, clamp=None):
     """Slow reference implementation of `bias_act()` using standard TensorFlow ops.
     """
     assert isinstance(x, torch.Tensor)
-    assert clamp is None or clamp >= 0
     spec = activation_funcs[act]
-    alpha = float(alpha if alpha is not None else spec.def_alpha)
-    gain = float(gain if gain is not None else spec.def_gain)
-    clamp = float(clamp if clamp is not None else -1)
+    alpha, gain, clamp = _parse_arguments(spec=spec, alpha=alpha, gain=gain, clamp=clamp)
 
     # Add bias.
     if b is not None:
@@ -135,12 +142,8 @@ _bias_act_cuda_cache = dict()
 def _bias_act_cuda(dim=1, act='linear', alpha=None, gain=None, clamp=None):
     """Fast CUDA implementation of `bias_act()` using custom ops.
     """
-    # Parse arguments.
-    assert clamp is None or clamp >= 0
     spec = activation_funcs[act]
-    alpha = float(alpha if alpha is not None else spec.def_alpha)
-    gain = float(gain if gain is not None else spec.def_gain)
-    clamp = float(clamp if clamp is not None else -1)
+    alpha, gain, clamp = _parse_arguments(spec=spec, alpha=alpha, gain=gain, clamp=clamp)
 
     # Lookup from cache.
     key = (dim, act, alpha, gain, clamp)
