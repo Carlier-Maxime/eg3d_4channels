@@ -11,6 +11,8 @@
 """Custom PyTorch ops for efficient bias and activation."""
 
 import os
+from types import ModuleType
+
 import numpy as np
 import torch
 import dnnlib
@@ -34,7 +36,7 @@ activation_funcs = {
 
 # ----------------------------------------------------------------------------
 
-_plugin = None
+_plugin: ModuleType | None = None
 _null_tensor = torch.empty([0])
 
 
