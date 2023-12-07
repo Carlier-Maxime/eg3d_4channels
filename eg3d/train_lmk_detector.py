@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 from dnnlib import EasyDict
 from training.dataset import NumpyFolderDataset
-from training.landmarkDetection import LandmarkDetector
+from training.landmarkDetection import LandmarkDetector, LandmarkDetectorExperience
 
 
 @click.command()
@@ -27,6 +27,7 @@ from training.landmarkDetection import LandmarkDetector
 @click.option('--reduce-lr', help='reduce learning rate during training', type=click.Choice(['std', 'exp']), default=None, show_default=True)
 @click.option('--to-pth', help='save a network to pth file', type=bool, is_flag=True, default=False, show_default=True)
 @click.option('--no-tensorboard', help='disable tensorboard', type=bool, is_flag=True, default=False, show_default=True)
+@click.option('--detector-type', help='type of landmark detector used', type=click.Choice(['std', 'exp']), default='std', show_default=True)
 def main(**kwargs):
     opts = EasyDict(kwargs)
     dataset = NumpyFolderDataset(opts.data)
@@ -34,16 +35,22 @@ def main(**kwargs):
     if opts.resume is not None:
         print(f"Resume from {opts.resume}...", end="")
         if opts.resume.endswith('.pth'):
-            lmkDetector = LandmarkDetector(105, 256, 96).to(opts.device)
+            if opts.detector_type == 'exp':
+                lmkDetector = LandmarkDetectorExperience(105, 256, 96).to(opts.device)
+            else:
+                lmkDetector = LandmarkDetector(105, 256, 96).to(opts.device)
             w = torch.load(opts.resume)
             lmkDetector.load_state_dict(w)
         else:
             with open(opts.resume, 'rb') as f:
-                lmkDetector = pickle.Unpickler(f).load().to(opts.device)
+                lmkDetector = pickle.Unpickler(f).load().to(opts.device).requires_grad_(True)
         print(" Done")
     else:
         print("Create Network...", end='')
-        lmkDetector = LandmarkDetector(105, 256, 96).to(opts.device)
+        if opts.detector_type == 'exp':
+            lmkDetector = LandmarkDetectorExperience(105, 256, 96).to(opts.device)
+        else:
+            lmkDetector = LandmarkDetector(105, 256, 96).to(opts.device)
         print(" Done")
     tf_events = None
     try:
