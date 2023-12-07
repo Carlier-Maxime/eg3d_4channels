@@ -26,6 +26,7 @@ from training.landmarkDetection import LandmarkDetector
 @click.option('--resume', help='resume from pth or pkl file', metavar='[pth|pkl]', type=str, default=None, show_default=True)
 @click.option('--reduce-lr', help='reduce learning rate during training', type=click.Choice(['std', 'exp']), default=None, show_default=True)
 @click.option('--to-pth', help='save a network to pth file', type=bool, is_flag=True, default=False, show_default=True)
+@click.option('--no-tensorboard', help='disable tensorboard', type=bool, is_flag=True, default=False, show_default=True)
 def main(**kwargs):
     opts = EasyDict(kwargs)
     dataset = NumpyFolderDataset(opts.data)
@@ -44,11 +45,12 @@ def main(**kwargs):
         print("Create Network...", end='')
         lmkDetector = LandmarkDetector(105, 256, 96).to(opts.device)
         print(" Done")
+    tf_events = None
     try:
-        import torch.utils.tensorboard as tensorboard
-        tf_events = tensorboard.SummaryWriter(log_dir=opts.output)
+        if not opts.no_tensorboard:
+            import torch.utils.tensorboard as tensorboard
+            tf_events = tensorboard.SummaryWriter(log_dir=opts.output)
     except ImportError:
-        tf_events = None
         print("skipped : tensorboard, module not found")
     total_params = 0
     for name, param in lmkDetector.named_parameters():
