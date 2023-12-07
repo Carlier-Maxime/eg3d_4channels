@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import torch.nn as nn
 
 from torch_utils import persistence
 from training.networks_stylegan2 import DiscriminatorEpilogue, DiscriminatorBlock
@@ -43,7 +44,7 @@ class LandmarkDetector(torch.nn.Module):
                                        first_layer_idx=cur_layer_idx, use_fp16=use_fp16, **block_kwargs, **common_kwargs)
             setattr(self, f'b{res}', block)
             cur_layer_idx += block.num_layers
-        self.b4 = DiscriminatorEpilogue(channels_dict[4], cmap_dim=nb_pts*3, resolution=4, use_cmap=False, **epilogue_kwargs, **common_kwargs)
+        self.b4 = DiscriminatorEpilogue(channels_dict[4], cmap_dim=nb_pts * 3, resolution=4, use_cmap=False, **epilogue_kwargs, **common_kwargs)
 
     def forward(self, img, update_emas=False, **block_kwargs):
         _ = update_emas  # unused
@@ -57,3 +58,63 @@ class LandmarkDetector(torch.nn.Module):
 
     def extra_repr(self):
         return f'c_dim={self.c_dim:d}, img_resolution={self.img_resolution:d}, img_channels={self.img_channels:d}'
+
+
+@persistence.persistent_class
+class LandmarkDetectorExperience(nn.Module):
+    def __init__(self,
+                 nb_pts,
+                 img_resolution,  # Input resolution.
+                 img_channels,  # Number of input color channels.
+                 architecture='resnet',  # Architecture: 'orig', 'skip', 'resnet'.
+                 channel_base=32768,  # Overall multiplier for the number of channels.
+                 channel_max=512,  # Maximum number of channels in any layer.
+                 num_fp16_res=4,  # Use FP16 for the N highest resolutions.
+                 conv_clamp=256,  # Clamp the output of convolution layers to +-X, None = disable clamping.
+                 block_kwargs=None,  # Arguments for DiscriminatorBlock.
+                 epilogue_kwargs=None,  # Arguments for DiscriminatorEpilogue.
+                 ):
+        super().__init__()
+        self.features = nn.Sequential(
+            nn.Conv2d(96, 96, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True),
+            nn.Conv2d(96, 128, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True),
+            nn.Conv2d(128, 128, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Conv2d(128, 128, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Conv2d(128, 128, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True),
+            nn.Conv2d(128, 256, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True),
+            nn.Conv2d(256, 256, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Conv2d(256, 256, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True),
+            nn.Conv2d(256, 512, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True),
+            nn.Conv2d(512, 512, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Conv2d(512, 512, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Conv2d(512, 512, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True),
+            nn.Conv2d(512, 1024, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True),
+            nn.Conv2d(1024, 1024, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Conv2d(1024, 1024, kernel_size=3, dilation=1, padding=1))
+
+        """self.CPM_feature = nn.Sequential(
+            nn.Conv2d(512, 256, kernel_size=3, padding=1), nn.ReLU(inplace=True),  # CPM_1
+            nn.Conv2d(256, 128, kernel_size=3, padding=1), nn.ReLU(inplace=True))  # CPM_2
+
+        self.stage1 = nn.Sequential(
+            nn.Conv2d(128, 128, kernel_size=3, padding=1), nn.ReLU(inplace=True),
+            nn.Conv2d(128, 128, kernel_size=3, padding=1), nn.ReLU(inplace=True),
+            nn.Conv2d(128, 256, kernel_size=1, padding=0), nn.ReLU(inplace=True),
+            nn.Conv2d(256, 105, kernel_size=1, padding=0))"""
+        self.fc_layers = nn.Sequential(
+            nn.Linear(1024 * 4 * 4, 1024), nn.ReLU(inplace=True),
+            nn.Linear(1024, 1024), nn.ReLU(inplace=True),
+            nn.Linear(1024, 105 * 3)
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.features(x)
+        x = x.view(x.shape[0], -1)
+        x = self.fc_layers(x)
+        return x.reshape(x.shape[0], x.shape[1] // 3, -1)
