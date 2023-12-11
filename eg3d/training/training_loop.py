@@ -10,25 +10,25 @@
 
 """Main training loop."""
 
-import os
-import time
 import copy
 import json
+import os
 import pickle
-import psutil
+import time
+
 import PIL.Image
 import numpy as np
+import psutil
 import torch
+import torch.utils.data
+
 import dnnlib
+import legacy
+from metrics import metric_main
 from torch_utils import misc
 from torch_utils import training_stats
 from torch_utils.ops import conv2d_gradfix
 from torch_utils.ops import grid_sample_gradfix
-
-import legacy
-from metrics import metric_main
-from camera_utils import LookAtPoseSampler
-from training.crosssection_utils import sample_cross_section
 
 
 # ----------------------------------------------------------------------------
@@ -99,15 +99,15 @@ def save_image_grid(img, fname, drange, grid_size):
 
 def training_loop(
         run_dir='.',  # Output directory.
-        training_set_kwargs={},  # Options for training set.
-        data_loader_kwargs={},  # Options for torch.utils.data.DataLoader.
-        G_kwargs={},  # Options for generator network.
-        D_kwargs={},  # Options for discriminator network.
-        G_opt_kwargs={},  # Options for generator optimizer.
-        D_opt_kwargs={},  # Options for discriminator optimizer.
+        training_set_kwargs=None,  # Options for training set.
+        data_loader_kwargs=None,  # Options for torch.utils.data.DataLoader.
+        G_kwargs=None,  # Options for generator network.
+        D_kwargs=None,  # Options for discriminator network.
+        G_opt_kwargs=None,  # Options for generator optimizer.
+        D_opt_kwargs=None,  # Options for discriminator optimizer.
         augment_kwargs=None,  # Options for augmentation pipeline. None = disable.
-        loss_kwargs={},  # Options for loss function.
-        metrics=[],  # Metrics to evaluate during training.
+        loss_kwargs=None,  # Options for loss function.
+        metrics=None,  # Metrics to evaluate during training.
         random_seed=0,  # Global random seed.
         num_gpus=1,  # Number of GPUs participating in the training.
         rank=0,  # Rank of the current process in [0, num_gpus[.
@@ -133,6 +133,22 @@ def training_loop(
         single_gpu_index=0
 ):
     # Initialize.
+    if metrics is None:
+        metrics = []
+    if loss_kwargs is None:
+        loss_kwargs = {}
+    if D_opt_kwargs is None:
+        D_opt_kwargs = {}
+    if G_opt_kwargs is None:
+        G_opt_kwargs = {}
+    if D_kwargs is None:
+        D_kwargs = {}
+    if G_kwargs is None:
+        G_kwargs = {}
+    if data_loader_kwargs is None:
+        data_loader_kwargs = {}
+    if training_set_kwargs is None:
+        training_set_kwargs = {}
     start_time = time.time()
     device = torch.device('cuda', rank if num_gpus > 1 else single_gpu_index)
     np.random.seed(random_seed * num_gpus + rank)
@@ -247,9 +263,11 @@ def training_loop(
         stats_jsonl = open(os.path.join(run_dir, 'stats.jsonl'), 'wt')
         try:
             import torch.utils.tensorboard as tensorboard
-            stats_tfevents = tensorboard.SummaryWriter(run_dir)
         except ImportError as err:
+            tensorboard = None
             print('Skipping tfevents export:', err)
+        if tensorboard:
+            stats_tfevents = tensorboard.SummaryWriter(run_dir)
 
     # Train.
     if rank == 0:
@@ -310,7 +328,7 @@ def training_loop(
 
         # Update G_ema.
         with torch.autograd.profiler.record_function('Gema'):
-            ema_nimg = ema_kimg * 1000
+            ema_nimg: float = ema_kimg * 1000
             if ema_rampup is not None:
                 ema_nimg = min(ema_nimg, cur_nimg * ema_rampup)
             ema_beta = 0.5 ** (batch_size / max(ema_nimg, 1e-8))
