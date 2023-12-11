@@ -390,31 +390,6 @@ def training_loop(
             save_image_grid(images_raw, os.path.join(run_dir, f'fakes{cur_nimg // 1000:06d}_raw.png'), drange=[-1, 1], grid_size=grid_size)
             save_image_grid(images_depth, os.path.join(run_dir, f'fakes{cur_nimg // 1000:06d}_depth.png'), drange=[images_depth.min(), images_depth.max()], grid_size=grid_size)
 
-            # --------------------
-            # # Log forward-conditioned images
-
-            # forward_cam2world_pose = LookAtPoseSampler.sample(3.14/2, 3.14/2, torch.tensor([0, 0, 0.2], device=device), radius=2.7, device=device)
-            # intrinsics = torch.tensor([[4.2647, 0, 0.5], [0, 4.2647, 0.5], [0, 0, 1]], device=device)
-            # forward_label = torch.cat([forward_cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
-
-            # grid_ws = [G_ema.mapping(z, forward_label.expand(z.shape[0], -1)) for z, c in zip(grid_z, grid_c)]
-            # out = [G_ema.synthesis(ws, c=c, noise_mode='const') for ws, c in zip(grid_ws, grid_c)]
-
-            # images = torch.cat([o['image'].cpu() for o in out]).numpy()
-            # images_raw = torch.cat([o['image_raw'].cpu() for o in out]).numpy()
-            # images_depth = -torch.cat([o['image_depth'].cpu() for o in out]).numpy()
-            # save_image_grid(images, os.path.join(run_dir, f'fakes{cur_nimg//1000:06d}_f.png'), drange=[-1,1], grid_size=grid_size)
-            # save_image_grid(images_raw, os.path.join(run_dir, f'fakes{cur_nimg//1000:06d}_raw_f.png'), drange=[-1,1], grid_size=grid_size)
-            # save_image_grid(images_depth, os.path.join(run_dir, f'fakes{cur_nimg//1000:06d}_depth_f.png'), drange=[images_depth.min(), images_depth.max()], grid_size=grid_size)
-
-            # --------------------
-            # # Log Cross sections
-
-            # grid_ws = [G_ema.mapping(z, c.expand(z.shape[0], -1)) for z, c in zip(grid_z, grid_c)]
-            # out = [sample_cross_section(G_ema, ws, w=G.rendering_kwargs['box_warp']) for ws, c in zip(grid_ws, grid_c)]
-            # crossections = torch.cat([o.cpu() for o in out]).numpy()
-            # save_image_grid(crossections, os.path.join(run_dir, f'fakes{cur_nimg//1000:06d}_crossection.png'), drange=[-50,100], grid_size=grid_size)
-
         # Save network snapshot.
         snapshot_pkl = None
         snapshot_data = None
