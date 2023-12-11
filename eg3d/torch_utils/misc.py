@@ -12,6 +12,7 @@ import re
 import contextlib
 import numpy as np
 import torch
+import torch.utils.data
 import warnings
 import dnnlib
 
@@ -50,6 +51,7 @@ def constant(value, shape=None, dtype=None, device=None, memory_format=None):
 try:
     nan_to_num = torch.nan_to_num  # 1.8.0a0
 except AttributeError:
+    # noinspection PyShadowingBuiltins
     def nan_to_num(input, nan=0.0, posinf=None, neginf=None, *, out=None):  # pylint: disable=redefined-builtin
         assert isinstance(input, torch.Tensor)
         if posinf is None:
@@ -63,8 +65,10 @@ except AttributeError:
 # Symbolic assert.
 
 try:
+    # noinspection PyProtectedMember
     symbolic_assert = torch._assert  # 1.8.0a0 # pylint: disable=protected-access
 except AttributeError:
+    # noinspection PyUnresolvedReferences
     symbolic_assert = torch.Assert  # 1.7.0
 
 
@@ -123,7 +127,7 @@ class InfiniteSampler(torch.utils.data.Sampler):
         assert num_replicas > 0
         assert 0 <= rank < num_replicas
         assert 0 <= window_size <= 1
-        super().__init__(dataset)
+        super().__init__()
         self.dataset = dataset
         self.rank = rank
         self.num_replicas = num_replicas
