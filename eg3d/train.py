@@ -28,7 +28,7 @@ from torch_utils import custom_ops
 
 # ----------------------------------------------------------------------------
 
-def subprocess_fn(rank, args, temp_dir):
+def subprocess_fn(rank, args, temp_dir, local_rank=-1):
     c = args
     dnnlib.util.Logger(file_name=os.path.join(c.run_dir, 'log.txt'), file_mode='a', should_flush=True)
 
@@ -37,12 +37,12 @@ def subprocess_fn(rank, args, temp_dir):
         custom_ops.verbosity = 'none'
 
     # Execute training loop.
-    training_loop.training_loop(rank=rank, **c)
+    training_loop.training_loop(rank=rank, local_rank=local_rank, **c)
 
 
 # ----------------------------------------------------------------------------
 
-def launch_training(c, desc, outdir, dry_run):
+def launch_training(c, desc, outdir, dry_run, use_idr_torch: bool = False):
     dnnlib.util.Logger(should_flush=True)
 
     # Pick output directory.
@@ -84,7 +84,7 @@ def launch_training(c, desc, outdir, dry_run):
 
     # Launch processes.
     print('Launching processes...')
-    launch_multiprocessing(subprocess_fn, c)
+    launch_multiprocessing(subprocess_fn, c, use_idr_torch)
 
 
 # ----------------------------------------------------------------------------
@@ -139,6 +139,7 @@ def parse_comma_separated_list(s):
 @click.option('--dlr', help='D learning rate', metavar='FLOAT', type=click.FloatRange(min=0), default=0.002, show_default=True)
 @click.option('--map-depth', help='Mapping network depth  [default: varies]', metavar='INT', type=click.IntRange(min=1), default=2, show_default=True)
 @click.option('--mbstd-group', help='Minibatch std group size', metavar='INT', type=click.IntRange(min=1), default=4, show_default=True)
+@click.option('--use-idr_torch', help='Use idr_torch for multiprocessing', type=bool, is_flag=True, default=False, show_default=True)
 # Misc settings.
 @click.option('--desc', help='String to include in result dir name', metavar='STR', type=str)
 @click.option('--metrics', help='Quality metrics', metavar='[NAME|A,B,C|none]', type=parse_comma_separated_list, default='fid50k_full', show_default=True)
@@ -379,7 +380,7 @@ def main(**kwargs):
         desc += f'-{opts.desc}'
 
     # Launch.
-    launch_training(c=c, desc=desc, outdir=opts.outdir, dry_run=opts.dry_run)
+    launch_training(c=c, desc=desc, outdir=opts.outdir, dry_run=opts.dry_run, use_idr_torch=opts.use_idr_torch)
 
 
 # ----------------------------------------------------------------------------

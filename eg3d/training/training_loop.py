@@ -111,6 +111,7 @@ def training_loop(
         random_seed=0,  # Global random seed.
         num_gpus=1,  # Number of GPUs participating in the training.
         rank=0,  # Rank of the current process in [0, num_gpus[.
+        local_rank=-1,  # Rank for the current node
         batch_size=4,  # Total batch size for one training iteration. Can be larger than batch_gpu * num_gpus.
         batch_gpu=4,  # Number of samples processed at a time by one GPU.
         ema_kimg=10,  # Half-life of the exponential moving average (EMA) of generator weights.
@@ -149,8 +150,10 @@ def training_loop(
         data_loader_kwargs = {}
     if training_set_kwargs is None:
         training_set_kwargs = {}
+    if local_rank==-1:
+        local_rank = rank
     start_time = time.time()
-    device = torch.device('cuda', rank if num_gpus > 1 else single_gpu_index)
+    device = torch.device('cuda', local_rank if num_gpus > 1 else single_gpu_index)
     np.random.seed(random_seed * num_gpus + rank)
     torch.manual_seed(random_seed * num_gpus + rank)
     torch.backends.cudnn.benchmark = cudnn_benchmark  # Improves training speed.
