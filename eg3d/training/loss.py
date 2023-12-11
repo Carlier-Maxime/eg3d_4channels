@@ -94,6 +94,27 @@ class StyleGAN2Loss(Loss):
         logits = self.D(img, c, update_emas=update_emas)
         return logits
 
+    def density_reg_sigma(self, z, c, swapping_prob, perturbation_amplitude, nb_points: int = 1000):
+        ws = self.get_G_ws(z, c, swapping_prob, style_mixing=False)
+        initial_coordinates = torch.rand((ws.shape[0], nb_points, 3), device=ws.device) * 2 - 1  # Front
+        perturbed_coordinates = initial_coordinates + torch.tensor([0, 0, -1], device=ws.device) * (1 / 256) * perturbation_amplitude  # Behind
+        all_coordinates = torch.cat([initial_coordinates, perturbed_coordinates], dim=1)
+        sigma = self.G.sample_mixed(all_coordinates, torch.randn_like(all_coordinates), ws, update_emas=False)['sigma']
+        sigma_initial = sigma[:, :sigma.shape[1] // 2]
+        sigma_perturbed = sigma[:, sigma.shape[1] // 2:]
+        return sigma_initial, sigma_perturbed
+
+    def density_reg_l1(self, z, c, gain, swapping_prob, perturbation_amplitude):
+        sigma_initial, sigma_perturbed = self.density_reg_sigma(z, c, swapping_prob, perturbation_amplitude, nb_points=1000)
+        TVloss = torch.nn.functional.l1_loss(sigma_initial, sigma_perturbed) * self.G.rendering_kwargs['density_reg']
+        TVloss.mul(gain).backward()
+
+    def density_reg_monotonic(self, z, c, gain, swapping_prob, fixed: bool = False):
+        sigma_initial, sigma_perturbed = self.density_reg_sigma(z, c, swapping_prob, self.G.rendering_kwargs['box_warp'], nb_points=2000)
+        monotonic_loss = torch.relu((sigma_initial if fixed else sigma_initial.detach()) - sigma_perturbed).mean() * 10
+        monotonic_loss.mul(gain).backward()
+        self.density_reg_l1(z, c, gain, swapping_prob, self.G.rendering_kwargs['box_warp'])
+
     def accumulate_gradients(self, phase, real_img, real_c, gen_z, gen_c, gain, cur_nimg):
         assert phase in ['Gmain', 'Greg', 'Gboth', 'Dmain', 'Dreg', 'Dboth']
         if self.G.rendering_kwargs.get('density_reg', 0) == 0:
@@ -136,68 +157,15 @@ class StyleGAN2Loss(Loss):
 
         # Density Regularization
         if phase in ['Greg', 'Gboth'] and self.G.rendering_kwargs.get('density_reg', 0) > 0 and self.G.rendering_kwargs['reg_type'] == 'l1':
-            ws = self.get_G_ws(gen_z, gen_c, swapping_prob)
-            initial_coordinates = torch.rand((ws.shape[0], 1000, 3), device=ws.device) * 2 - 1
-            perturbed_coordinates = initial_coordinates + torch.randn_like(initial_coordinates) * self.G.rendering_kwargs['density_reg_p_dist']
-            all_coordinates = torch.cat([initial_coordinates, perturbed_coordinates], dim=1)
-            sigma = self.G.sample_mixed(all_coordinates, torch.randn_like(all_coordinates), ws, update_emas=False)['sigma']
-            sigma_initial = sigma[:, :sigma.shape[1] // 2]
-            sigma_perturbed = sigma[:, sigma.shape[1] // 2:]
-
-            TVloss = torch.nn.functional.l1_loss(sigma_initial, sigma_perturbed) * self.G.rendering_kwargs['density_reg']
-            TVloss.mul(gain).backward()
+            self.density_reg_l1(gen_z, gen_c, gain, swapping_prob, self.G.rendering_kwargs['density_reg_p_dist'])
 
         # Alternative density regularization
         if phase in ['Greg', 'Gboth'] and self.G.rendering_kwargs.get('density_reg', 0) > 0 and self.G.rendering_kwargs['reg_type'] == 'monotonic-detach':
-            ws = self.get_G_ws(gen_z, gen_c, swapping_prob, style_mixing=False)
-
-            initial_coordinates = torch.rand((ws.shape[0], 2000, 3), device=ws.device) * 2 - 1  # Front
-
-            perturbed_coordinates = initial_coordinates + torch.tensor([0, 0, -1], device=ws.device) * (1 / 256) * self.G.rendering_kwargs['box_warp']  # Behind
-            all_coordinates = torch.cat([initial_coordinates, perturbed_coordinates], dim=1)
-            sigma = self.G.sample_mixed(all_coordinates, torch.randn_like(all_coordinates), ws, update_emas=False)['sigma']
-            sigma_initial = sigma[:, :sigma.shape[1] // 2]
-            sigma_perturbed = sigma[:, sigma.shape[1] // 2:]
-
-            monotonic_loss = torch.relu(sigma_initial.detach() - sigma_perturbed).mean() * 10
-            monotonic_loss.mul(gain).backward()
-
-            ws = self.get_G_ws(gen_z, gen_c, swapping_prob)
-            initial_coordinates = torch.rand((ws.shape[0], 1000, 3), device=ws.device) * 2 - 1
-            perturbed_coordinates = initial_coordinates + torch.randn_like(initial_coordinates) * (1 / 256) * self.G.rendering_kwargs['box_warp']
-            all_coordinates = torch.cat([initial_coordinates, perturbed_coordinates], dim=1)
-            sigma = self.G.sample_mixed(all_coordinates, torch.randn_like(all_coordinates), ws, update_emas=False)['sigma']
-            sigma_initial = sigma[:, :sigma.shape[1] // 2]
-            sigma_perturbed = sigma[:, sigma.shape[1] // 2:]
-
-            TVloss = torch.nn.functional.l1_loss(sigma_initial, sigma_perturbed) * self.G.rendering_kwargs['density_reg']
-            TVloss.mul(gain).backward()
+            self.density_reg_monotonic(gen_z, gen_c, gain, swapping_prob)
 
         # Alternative density regularization
         if phase in ['Greg', 'Gboth'] and self.G.rendering_kwargs.get('density_reg', 0) > 0 and self.G.rendering_kwargs['reg_type'] == 'monotonic-fixed':
-            ws = self.get_G_ws(gen_z, gen_c, swapping_prob, style_mixing=False)
-
-            initial_coordinates = torch.rand((ws.shape[0], 2000, 3), device=ws.device) * 2 - 1  # Front
-
-            perturbed_coordinates = initial_coordinates + torch.tensor([0, 0, -1], device=ws.device) * (1 / 256) * self.G.rendering_kwargs['box_warp']  # Behind
-            all_coordinates = torch.cat([initial_coordinates, perturbed_coordinates], dim=1)
-            sigma = self.G.sample_mixed(all_coordinates, torch.randn_like(all_coordinates), ws, update_emas=False)['sigma']
-            sigma_initial = sigma[:, :sigma.shape[1] // 2]
-            sigma_perturbed = sigma[:, sigma.shape[1] // 2:]
-
-            monotonic_loss = torch.relu(sigma_initial - sigma_perturbed).mean() * 10
-            monotonic_loss.mul(gain).backward()
-
-            ws = self.get_G_ws(gen_z, gen_c, swapping_prob)
-            initial_coordinates = torch.rand((ws.shape[0], 1000, 3), device=ws.device) * 2 - 1
-            perturbed_coordinates = initial_coordinates + torch.randn_like(initial_coordinates) * (1 / 256) * self.G.rendering_kwargs['box_warp']
-            all_coordinates = torch.cat([initial_coordinates, perturbed_coordinates], dim=1)
-            sigma = self.G.sample_mixed(all_coordinates, torch.randn_like(all_coordinates), ws, update_emas=False)['sigma']
-            sigma_initial = sigma[:, :sigma.shape[1] // 2]
-            sigma_perturbed = sigma[:, sigma.shape[1] // 2:]
-
-            TVloss = torch.nn.functional.l1_loss(sigma_initial, sigma_perturbed) * self.G.rendering_kwargs['density_reg']
-            TVloss.mul(gain).backward()
+            self.density_reg_monotonic(gen_z, gen_c, gain, swapping_prob, fixed=True)
 
         # Dmain: Minimize logits for generated images.
         loss_Dgen = 0
