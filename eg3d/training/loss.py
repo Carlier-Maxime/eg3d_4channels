@@ -156,16 +156,15 @@ class StyleGAN2Loss(Loss):
                 loss_Gmain.mean().mul(gain).backward()
 
         # Density Regularization
-        if phase in ['Greg', 'Gboth'] and self.G.rendering_kwargs.get('density_reg', 0) > 0 and self.G.rendering_kwargs['reg_type'] == 'l1':
-            self.density_reg_l1(gen_z, gen_c, gain, swapping_prob, self.G.rendering_kwargs['density_reg_p_dist'])
-
-        # Alternative density regularization
-        if phase in ['Greg', 'Gboth'] and self.G.rendering_kwargs.get('density_reg', 0) > 0 and self.G.rendering_kwargs['reg_type'] == 'monotonic-detach':
-            self.density_reg_monotonic(gen_z, gen_c, gain, swapping_prob)
-
-        # Alternative density regularization
-        if phase in ['Greg', 'Gboth'] and self.G.rendering_kwargs.get('density_reg', 0) > 0 and self.G.rendering_kwargs['reg_type'] == 'monotonic-fixed':
-            self.density_reg_monotonic(gen_z, gen_c, gain, swapping_prob, fixed=True)
+        if phase in ['Greg', 'Gboth'] and self.G.rendering_kwargs.get('density_reg', 0) > 0:
+            if self.G.rendering_kwargs['reg_type'] == 'l1':
+                self.density_reg_l1(gen_z, gen_c, gain, swapping_prob, self.G.rendering_kwargs['density_reg_p_dist'])
+            elif self.G.rendering_kwargs['reg_type'] == 'monotonic-detach':
+                self.density_reg_monotonic(gen_z, gen_c, gain, swapping_prob)
+            elif self.G.rendering_kwargs['reg_type'] == 'monotonic-fixed':
+                self.density_reg_monotonic(gen_z, gen_c, gain, swapping_prob, fixed=True)
+            else:
+                raise NotImplementedError
 
         # Dmain: Minimize logits for generated images.
         loss_Dgen = 0
