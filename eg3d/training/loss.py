@@ -77,7 +77,7 @@ class StyleGAN2Loss(Loss):
         gen_output = self.G.synthesis(ws, c, neural_rendering_resolution=neural_rendering_resolution, update_emas=update_emas)
         return gen_output, ws
 
-    def run_D(self, img, c, blur_sigma=0, blur_sigma_raw=0, update_emas=False):
+    def run_D(self, img, c, blur_sigma=0, update_emas=False):
         blur_size = np.floor(blur_sigma * 3)
         if blur_size > 0:
             with torch.autograd.profiler.record_function('blur'):
