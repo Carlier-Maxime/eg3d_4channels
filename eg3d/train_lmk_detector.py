@@ -54,11 +54,12 @@ def main(**kwargs):
         print(" Done")
     tf_events = None
     try:
-        if not opts.no_tensorboard:
-            import torch.utils.tensorboard as tensorboard
-            tf_events = tensorboard.SummaryWriter(log_dir=opts.output)
+        import torch.utils.tensorboard as tensorboard
     except ImportError:
+        tensorboard = None
         print("skipped : tensorboard, module not found")
+    if not opts.no_tensorboard and tensorboard is not None:
+        tf_events = tensorboard.SummaryWriter(log_dir=opts.output)
     total_params = 0
     for name, param in lmkDetector.named_parameters():
         if param.requires_grad:
@@ -74,14 +75,14 @@ def main(**kwargs):
     lr = opts.lr
     scheduler = None
     if opts.reduce_lr == 'exp':
-        scheduler = lr_scheduler.ExponentialLR(optimizer, gamma=0.99)
+        scheduler = lr_scheduler.ExponentialLR(optimizer, gamma=0.999)
     while nb_epochs < opts.epochs:
         for features_map, real_lmks in dataloader:
             real_lmks = real_lmks.to(opts.device).to(torch.float32)
             features_map = features_map.to(opts.device).to(torch.float32)
             lmks = lmkDetector(features_map)
             loss = criterion(lmks, real_lmks)
-            pbar.set_postfix(lr=f'{optimizer.param_groups[0]['lr']:.3e}', loss=f'{float(loss):.3e}')
+            pbar.set_postfix(lr=f"{optimizer.param_groups[0]['lr']:.3e}", loss=f'{float(loss):.3e}')
             if tf_events is not None:
                 tf_events.add_scalar('Loss/Train', loss.item(), nb_epochs)
             optimizer.zero_grad()
