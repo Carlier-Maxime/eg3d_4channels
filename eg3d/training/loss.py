@@ -17,8 +17,8 @@ from torch_utils.ops import conv2d_gradfix
 from torch_utils.ops import upfirdn2d
 from training.dual_discriminator import filtered_resizing
 
-
 # ----------------------------------------------------------------------------
+
 
 class Loss:
     def accumulate_gradients(self, phase, real_img, real_c, gen_z, gen_c, gain, cur_nimg):  # to be overridden by subclass
@@ -216,4 +216,54 @@ class StyleGAN2Loss(Loss):
             with torch.autograd.profiler.record_function(name + '_backward'):
                 (loss_Dreal + loss_Dr1).mean().mul(gain).backward()
 
+
 # ----------------------------------------------------------------------------
+
+class SpaceRegulizer:
+    def __init__(self, original_G, lpips_net, l2_lambda: float = 0.1, lpips_lambda: float = 0.1, alpha: float = 30):
+        self.original_G = original_G
+        self.device = original_G.device
+        self.alpha = alpha
+        self.morphing_regulizer_alpha = self.alpha
+        self.lpips_loss = lpips_net
+        self.l2_loss = torch.nn.MSELoss(reduction='mean')
+        self.l2_lambda = l2_lambda
+        self.lpips_lambda = lpips_lambda
+
+    def get_morphed_w_code(self, new_w_code, fixed_w):
+        interpolation_direction = new_w_code - fixed_w
+        interpolation_direction_norm = torch.norm(interpolation_direction, p=2)
+        direction_to_move = self.alpha * interpolation_direction / interpolation_direction_norm
+        result_w = fixed_w + direction_to_move
+        self.morphing_regulizer_alpha * fixed_w + (1 - self.morphing_regulizer_alpha) * new_w_code
+
+        return result_w
+
+    def get_image_from_ws(self, w_codes, G):
+        return torch.cat([G.synthesis(w_code, noise_mode='none', force_fp32=True) for w_code in w_codes])
+
+    def ball_holder_loss_lazy(self, new_G, num_of_sampled_latents, w_batch):
+        loss = 0.0
+        z_samples = np.random.randn(num_of_sampled_latents, self.original_G.z_dim)
+        c_samples = np.random.randn(num_of_sampled_latents, self.original_G.c_dim)
+        w_samples = self.original_G.mapping(z=torch.from_numpy(z_samples).to(self.device), c=torch.from_numpy(c_samples).to(self.device),
+                                            truncation_psi=0.5)
+        territory_indicator_ws = [self.get_morphed_w_code(w_code.unsqueeze(0), w_batch) for w_code in w_samples]
+
+        for w_code in territory_indicator_ws:
+            new_img = new_G.synthesis(w_code, noise_mode='none', force_fp32=True)
+            with torch.no_grad():
+                old_img = self.original_G.synthesis(w_code, torch.from_numpy(c_samples).to(self.device))
+            if self.l2_lambda > 0:
+                l2_loss_val = self.l2_loss(old_img, new_img)
+                loss += l2_loss_val * self.l2_lambda
+            if self.lpips_lambda > 0:
+                loss_lpips = self.lpips_loss(old_img, new_img)
+                loss_lpips = torch.mean(torch.squeeze(loss_lpips))
+                loss += loss_lpips * self.lpips_lambda
+
+        return loss / len(territory_indicator_ws)
+
+    def space_regulizer_loss(self, new_G, w_batch, ball_num_of_samples: int = 1):
+        ret_val = self.ball_holder_loss_lazy(new_G, ball_num_of_samples, w_batch)
+        return ret_val

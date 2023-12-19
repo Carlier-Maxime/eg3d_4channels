@@ -16,6 +16,7 @@ import zipfile
 import PIL.Image
 import json
 import torch
+import torch.utils.data
 import dnnlib
 
 try:
@@ -164,7 +165,7 @@ class Dataset(torch.utils.data.Dataset):
 
 class ImageFolderDataset(Dataset):
     def __init__(self,
-                 path,  # Path to directory or zip.
+                 path: str,  # Path to directory or zip.
                  resolution=None,  # Ensure specific resolution, None = highest available.
                  force_rgb=False,
                  **super_kwargs,  # Additional arguments for the Dataset base class.
@@ -250,7 +251,7 @@ class ImageFolderDataset(Dataset):
 # ----------------------------------------------------------------------------
 
 class NumpyFolderDataset(torch.utils.data.Dataset):
-    def __init__(self, path):
+    def __init__(self, path: str):
         self._path = path
         self._zipfile = None
 
@@ -301,5 +302,70 @@ class NumpyFolderDataset(torch.utils.data.Dataset):
         fname = self._numpy_fnames[idx]
         data = np.load(f'{self._path}/{fname}')
         return [torch.tensor(data[key]) for key in data.keys()] if os.path.splitext(fname)[1].lower() == '.npz' else torch.tensor(data)
+
+
+# ----------------------------------------------------------------------------
+
+
+class ImageAndNumpyDataset(torch.utils.data.Dataset):
+    def __init__(self, path: str, force_rgb: bool = False):
+        self._path = path
+        self._zipfile = None
+        self._force_rgb = force_rgb
+
+        if os.path.isdir(self._path):
+            self._type = 'dir'
+            self._all_fnames = {os.path.relpath(os.path.join(root, fname), start=self._path) for root, _dirs, files in os.walk(self._path) for fname in files}
+        elif self._file_ext(self._path) == '.zip':
+            self._type = 'zip'
+            self._all_fnames = set(self._get_zipfile().namelist())
+        else:
+            raise IOError('Path must point to a directory or zip')
+
+        self._numpy_fnames = sorted(fname for fname in self._all_fnames if self._file_ext(fname) in ['.npy'])
+        self._image_fnames = sorted(fname for fname in self._all_fnames if self._file_ext(fname) in ['.png', '.jpg'])
+        if len(self._numpy_fnames) == 0 or len(self._image_fnames) == 0:
+            raise IOError('No numpy files or images files found in the specified path')
+
+    @staticmethod
+    def _file_ext(fname):
+        return os.path.splitext(fname)[1].lower()
+
+    def _get_zipfile(self):
+        assert self._type == 'zip'
+        if self._zipfile is None:
+            self._zipfile = zipfile.ZipFile(self._path)
+        return self._zipfile
+
+    def _open_file(self, fname):
+        if self._type == 'dir':
+            return open(os.path.join(self._path, fname), 'rb')
+        if self._type == 'zip':
+            return self._get_zipfile().open(fname, 'r')
+        return None
+
+    def close(self):
+        try:
+            if self._zipfile is not None:
+                self._zipfile.close()
+        finally:
+            self._zipfile = None
+
+    def __del__(self):
+        self.close()
+
+    def __len__(self):
+        return len(self._numpy_fnames)
+
+    def __getitem__(self, idx):
+        data = torch.from_numpy(np.load(f'{self._path}/{self._numpy_fnames[idx]}'))
+        img = torch.from_numpy(np.array(PIL.Image.open(f'{self._path}/{self._image_fnames[idx]}')))
+        if img.ndim == 2:
+            img = img[:, :, None]  # HW => HWC
+        img = img.permute(2, 0, 1)  # HWC => CHW
+        img = img[:3] if self._force_rgb else img
+        mean = torch.tensor([0.5, 0.5, 0.5])
+        img = ((img.float() / 255.0) - mean[:, None, None]) / mean[:, None, None]
+        return self._image_fnames[idx].split(".")[0], img, data
 
 # ----------------------------------------------------------------------------
