@@ -14,7 +14,7 @@ class SingleIDCoach(BaseCoach):
         i = 0
         for img_name, imgs, ws_pivots in tqdm(self.data_loader):
             self.restart_training()
-            if self.image_counter >= limit:
+            if self.image_counter >= limit > 0:
                 break
 
             ws_pivots = ws_pivots.to(self._device)

@@ -17,7 +17,7 @@ class MultiIDCoach(BaseCoach):
         for _ in tqdm(range(nb_steps)):
             self.image_counter = 0
             for img_name, imgs, ws_pivots in self.data_loader:
-                if self.image_counter >= limit:
+                if self.image_counter >= limit > 0:
                     break
 
                 real_images_batch = imgs.to(self._device)
