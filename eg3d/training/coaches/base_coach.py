@@ -4,6 +4,7 @@ import copy
 from training.loss import SpaceRegulizer
 import torch
 from lpips import LPIPS
+import legacy
 
 
 class BaseCoach:
@@ -39,7 +40,7 @@ class BaseCoach:
         for p in self.G.parameters():
             p.requires_grad = True
         self.original_G = copy.deepcopy(self.G)
-        self.space_regulizer = SpaceRegulizer(self.original_G, self.lpips_loss)
+        self.space_regulizer = SpaceRegulizer(self.original_G, self.lpips_loss, self._device)
         self.optimizer = self.configure_optimizers()
 
     @abc.abstractmethod

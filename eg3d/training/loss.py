@@ -220,9 +220,9 @@ class StyleGAN2Loss(Loss):
 # ----------------------------------------------------------------------------
 
 class SpaceRegulizer:
-    def __init__(self, original_G, lpips_net, l2_lambda: float = 0.1, lpips_lambda: float = 0.1, alpha: float = 30):
+    def __init__(self, original_G: torch.nn.Module, lpips_net: torch.nn.Module, device: torch.device, l2_lambda: float = 0.1, lpips_lambda: float = 0.1, alpha: float = 30):
+        self.device = device
         self.original_G = original_G
-        self.device = original_G.device
         self.alpha = alpha
         self.morphing_regulizer_alpha = self.alpha
         self.lpips_loss = lpips_net
