@@ -14,14 +14,15 @@ channels:
   - nvidia
   - conda-forge
 dependencies:
-  - python = 3.12
+  - python = 3.11
   - pip
   - numpy>=1.20
   - click>=8.0
   - pillow>=8.3.1
   - scipy>=1.7.1
-  - pytorch>=2.1.0
-  - cudatoolkit>=11.1
+  - pytorch>=2.1.2
+  - torchvision>=0.16.2
+  - pytorch-cuda=12.1
   - requests>=2.26.0
   - tqdm>=4.62.2
   - ninja>=1.10.2
@@ -37,3 +38,4 @@ dependencies:
       - pyopengl>=3.1.5
       - imgui>=1.3.0
       - pyspng
+      - lpips
