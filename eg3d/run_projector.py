@@ -55,6 +55,17 @@ def inversion(G: TriPlaneGenerator, c, projector, target, num_steps, image_names
         np.save(f'{latents_outdir}/{file_basename}.npy', ws_)
 
 
+def create_sub_folder(i: int, dir_latents: str, dir_features: str, dir_snapshots: str) -> tuple[str, str, str]:
+    sub_folder = f'{i // 1000:05d}'
+    out_features = f'{dir_features}/{sub_folder}'
+    out_latents = f'{dir_latents}/{sub_folder}'
+    out_snapshots = f'{dir_snapshots}/{sub_folder}'
+    os.makedirs(out_features, exist_ok=True)
+    os.makedirs(out_latents, exist_ok=True)
+    os.makedirs(out_snapshots, exist_ok=True)
+    return out_latents, out_features, out_snapshots
+
+
 def subprocess_fn(rank, G, image_log_step, repeat_w, num_steps, datasets, batch, out_latents, out_features, out_snapshots, save_features_map, starts_index):
     dir_features = out_features
     dir_latents = out_latents
@@ -64,15 +75,11 @@ def subprocess_fn(rank, G, image_log_step, repeat_w, num_steps, datasets, batch,
     projector = EG3DInverter(device=device, w_avg_samples=600, image_log_step=image_log_step, repeat_w=repeat_w)
     G = G.to(device)
     i = starts_index[rank]
+    if i % 1000 != 0:
+        out_latents, out_features, out_snapshots = create_sub_folder(i, dir_latents, dir_features, dir_snapshots)
     for img, c in dataloader:
         if i % 1000 == 0:
-            sub_folder = f'{i // 1000:05d}'
-            out_features = f'{dir_features}/{sub_folder}'
-            out_latents = f'{dir_latents}/{sub_folder}'
-            out_snapshots = f'{dir_snapshots}/{sub_folder}'
-            os.makedirs(out_features, exist_ok=True)
-            os.makedirs(out_latents, exist_ok=True)
-            os.makedirs(out_snapshots, exist_ok=True)
+            out_latents, out_features, out_snapshots = create_sub_folder(i, dir_latents, dir_features, dir_snapshots)
         img = img.to(device)
         c = c.to(device)
         image_names = [f'{j:08d}' for j in range(i, i + batch)]
@@ -167,7 +174,7 @@ def run(
         sizes = [size_per_dataset for _ in range(gpus)]
         sizes[-1] += nb_data % gpus
         starts = [sum(sizes[:i]) for i in range(len(sizes))]
-        datasets = [Subset(dataset, range(start, start+size)) for start, size in zip(starts, sizes)]
+        datasets = [Subset(dataset, range(start, start + size)) for start, size in zip(starts, sizes)]
         torch.multiprocessing.set_start_method('spawn')
         torch.multiprocessing.spawn(fn=subprocess_fn, args=(G, image_log_step, latent_space_type == 'w', num_steps, datasets, batch, out_latents, out_features, out_snapshots, save_features_map, starts), nprocs=gpus)
 
