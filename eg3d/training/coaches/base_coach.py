@@ -95,7 +95,7 @@ class BaseCoach:
             loss += l2_loss_val * self.l2_lambda
         if self.lpips_lambda > 0:
             loss_lpips = self.lpips_loss(generated_images, real_images)
-            loss_lpips = torch.squeeze(loss_lpips)
+            loss_lpips = torch.squeeze(loss_lpips).mean()
             loss += loss_lpips * self.lpips_lambda
         if use_ball_holder and self.use_locality_regularization:
             ball_holder_loss_val = self.space_regulizer.space_regulizer_loss(new_G, w_batch)
