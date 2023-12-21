@@ -107,6 +107,5 @@ class BaseCoach:
 
     def save_preview(self, run_name: str, name: str, gen_img: torch.Tensor):
         preview_path = f'{self.outdir}/{run_name}/preview_for_{name}.png'
-        print("save preview to ", preview_path)
         gen_img = (gen_img.permute(1, 2, 0) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
         PIL.Image.fromarray(gen_img.cpu().numpy(), 'RGBA' if gen_img.shape[-1] == 4 else 'RGB').save(preview_path)

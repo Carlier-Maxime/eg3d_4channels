@@ -32,6 +32,5 @@ class SingleIDCoach(BaseCoach):
 
             for name, gen_img in zip(img_name, gen_imgs):
                 save_path = f'{self.outdir}/{run_name}/model_for_{name}.pth'
-                print('final model ckpt save to ', save_path)
                 torch.save(save_dict, save_path)
                 self.save_preview(run_name, name, gen_img)
