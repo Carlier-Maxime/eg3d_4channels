@@ -27,7 +27,7 @@ class MultiIDCoach(BaseCoach):
             if stop:
                 break
 
-        torch.save(self.G, f'{self.outdir}/model_{run_name}_multi_id.pt')
+        torch.save(self.G, f'{self.outdir}/{run_name}/model_{run_name}_multi_id.pt')
         for img_name, _, ws_pivots, camera in self.data_loader:
             ws_pivots = ws_pivots.to(self._device)
             camera = camera.to(self._device)
