@@ -17,6 +17,7 @@ from training.dataset import ImageAndNumpyFolderDataset
 @click.option('--force-rgb', type=bool, default=False, is_flag=True, help='force RGB images')
 @click.option('--run_name', type=str, default=''.join(choice(ascii_uppercase) for i in range(12)), help='run name, is used for saving results')
 @click.option('--use-multi-id', type=bool, default=False, is_flag=True, help='use multi id training')
+@click.option('--snapshot-step', type=int, default=100, help='the number of steps between saving a snapshot only for multi id')
 @click.option('--batch', type=int, default=1, help='batch size')
 @click.option('--device', type=str, default='cuda', help='the device used for Pivotal Tuning')
 @click.option('--limit', type=int, default=-1, help='the maximum number of images to used')
@@ -28,7 +29,7 @@ def run_PTI(**kwargs):
     dataset = ImageAndNumpyFolderDataset(opts.dataset, force_rgb=opts.force_rgb, use_labels=True)
     dataloader = DataLoader(dataset, batch_size=opts.batch, shuffle=False)
     coach = MultiIDCoach(opts.network, dataloader, opts.device, opts.lr, outdir=opts.outdir) if opts.use_multi_id else SingleIDCoach(opts.network, dataloader, opts.device, opts.lr, outdir=opts.outdir)
-    coach.train(opts.run_name, opts.num_steps, limit=opts.limit)
+    coach.train(opts.run_name, opts.num_steps, limit=opts.limit, snapshot_step=opts.snapshot_step)
     return opts.run_name
 
 

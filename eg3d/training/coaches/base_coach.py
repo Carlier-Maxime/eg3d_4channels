@@ -79,7 +79,7 @@ class BaseCoach:
         return gen_imgs
 
     @abc.abstractmethod
-    def train(self, run_name: str, nb_steps: int, limit: int = -1, lpips_threshold: float = 0):
+    def train(self, run_name: str, nb_steps: int, limit: int = -1, lpips_threshold: float = 0, **kwargs):
         pass
 
     def configure_optimizers(self):

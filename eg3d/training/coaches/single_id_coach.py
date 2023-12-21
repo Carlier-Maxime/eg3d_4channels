@@ -8,7 +8,7 @@ class SingleIDCoach(BaseCoach):
     def __init__(self, network_pkl: str, data_loader, device: torch.device, lr: float, outdir: str = "output"):
         super().__init__(network_pkl, data_loader, device, lr, outdir=outdir)
 
-    def train(self, run_name: str, nb_steps: int, limit: int = -1, lpips_threshold: float = 0):
+    def train(self, run_name: str, nb_steps: int, limit: int = -1, lpips_threshold: float = 0, **kwargs):
         os.makedirs(f'{self.outdir}/{run_name}', exist_ok=True)
         self._use_ball_holder = True
         self._step = 0
