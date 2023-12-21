@@ -1,7 +1,6 @@
 import torch
 from tqdm import tqdm
 from training.coaches.base_coach import BaseCoach
-import PIL.Image
 
 
 class MultiIDCoach(BaseCoach):
@@ -41,7 +40,4 @@ class MultiIDCoach(BaseCoach):
             camera = camera.to(self._device)
             generated_images = self.forward(ws_pivots, camera)
             for name, gen_img in zip(img_name, generated_images):
-                preview_path = f'{self.outdir}/{run_name}/preview_for_{name}.png'
-                print("save preview to ", preview_path)
-                gen_img = (gen_img.permute(1, 2, 0) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
-                PIL.Image.fromarray(gen_img.cpu().numpy(), 'RGBA' if gen_img.shape[-1] == 4 else 'RGB').save(preview_path)
+                self.save_preview(run_name, name, gen_img)

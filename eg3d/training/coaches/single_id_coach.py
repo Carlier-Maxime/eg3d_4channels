@@ -2,7 +2,6 @@ import os
 import torch
 from tqdm import tqdm
 from training.coaches.base_coach import BaseCoach
-import PIL.Image
 
 
 class SingleIDCoach(BaseCoach):
@@ -46,7 +45,4 @@ class SingleIDCoach(BaseCoach):
                 save_path = f'{self.outdir}/{run_name}/model_for_{name}.pth'
                 print('final model ckpt save to ', save_path)
                 torch.save(save_dict, save_path)
-                preview_path = f'{self.outdir}/{run_name}/preview_for_{name}.png'
-                print("save preview to ", preview_path)
-                gen_img = (gen_img.permute(1, 2, 0) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
-                PIL.Image.fromarray(gen_img.cpu().numpy(), 'RGBA' if gen_img.shape[-1] == 4 else 'RGB').save(preview_path)
+                self.save_preview(run_name, name, gen_img)
