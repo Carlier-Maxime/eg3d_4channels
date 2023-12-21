@@ -67,5 +67,5 @@ class BaseCoach:
             loss += ball_holder_loss_val
         return loss, l2_loss_val, loss_lpips
 
-    def forward(self, ws):
-        return self.G.backbone.synthesis(ws, noise_mode='const')['image']
+    def forward(self, ws, c):
+        return self.G.synthesis(ws, c, noise_mode='const')['image']

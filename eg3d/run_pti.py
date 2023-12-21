@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 import dnnlib
 from training.coaches.multi_id_coach import MultiIDCoach
 from training.coaches.single_id_coach import SingleIDCoach
-from training.dataset import ImageAndNumpyDataset
+from training.dataset import ImageAndNumpyFolderDataset
 
 
 @click.command()
@@ -25,7 +25,7 @@ from training.dataset import ImageAndNumpyDataset
 @click.option('--lr', type=float, default=3e-4, help='learning rate')
 def run_PTI(**kwargs):
     opts = dnnlib.EasyDict(kwargs)
-    dataset = ImageAndNumpyDataset(opts.dataset, force_rgb=opts.force_rgb)
+    dataset = ImageAndNumpyFolderDataset(opts.dataset, force_rgb=opts.force_rgb, use_labels=True)
     dataloader = DataLoader(dataset, batch_size=opts.batch, shuffle=False)
     coach = MultiIDCoach(opts.network, dataloader, opts.device, opts.lr, outdir=opts.outdir) if opts.use_multi_id else SingleIDCoach(opts.network, dataloader, opts.device, opts.lr, outdir=opts.outdir)
     coach.train(opts.run_name, opts.num_steps, limit=opts.limit)

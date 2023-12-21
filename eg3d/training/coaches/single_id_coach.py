@@ -2,6 +2,7 @@ import os
 import torch
 from tqdm import tqdm
 from training.coaches.base_coach import BaseCoach
+import PIL.Image
 
 
 class SingleIDCoach(BaseCoach):
@@ -12,16 +13,18 @@ class SingleIDCoach(BaseCoach):
         os.makedirs(f'{self.outdir}/{run_name}', exist_ok=True)
         use_ball_holder = True
         i = 0
-        for img_name, imgs, ws_pivots in tqdm(self.data_loader):
+        for img_name, imgs, ws_pivots, camera in tqdm(self.data_loader):
             self.restart_training()
             if self.image_counter >= limit > 0:
                 break
 
             ws_pivots = ws_pivots.to(self._device)
             imgs = imgs.to(self._device)
+            camera = camera.to(self._device)
 
+            generated_images = []
             for _ in tqdm(range(nb_steps)):
-                generated_images = self.forward(ws_pivots)
+                generated_images = self.forward(ws_pivots, camera)
                 loss, l2_loss_val, loss_lpips = self.calc_loss(generated_images, imgs, self.G, use_ball_holder, ws_pivots)
                 self.optimizer.zero_grad()
 
@@ -39,6 +42,11 @@ class SingleIDCoach(BaseCoach):
             save_dict = {
                 'G_ema': self.G.state_dict()
             }
-            save_path = f'{self.outdir}/{run_name}/model_for_{img_name}.pth'
-            print('final model ckpt save to ', save_path)
-            torch.save(save_dict, save_path)
+            for name, gen_img in zip(img_name, generated_images):
+                save_path = f'{self.outdir}/{run_name}/model_for_{name}.pth'
+                print('final model ckpt save to ', save_path)
+                torch.save(save_dict, save_path)
+                preview_path = f'{self.outdir}/{run_name}/preview_for_{name}.png'
+                print("save preview to ", preview_path)
+                gen_img = (gen_img.permute(1, 2, 0) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
+                PIL.Image.fromarray(gen_img.cpu().numpy(), 'RGBA' if gen_img.shape[-1] == 4 else 'RGB').save(preview_path)

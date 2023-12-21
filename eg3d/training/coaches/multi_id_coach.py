@@ -16,12 +16,12 @@ class MultiIDCoach(BaseCoach):
         i = 0
         for _ in tqdm(range(nb_steps)):
             self.image_counter = 0
-            for img_name, imgs, ws_pivots in self.data_loader:
+            for img_name, imgs, ws_pivots, camera in self.data_loader:
                 if self.image_counter >= limit > 0:
                     break
 
                 real_images_batch = imgs.to(self._device)
-                generated_images = self.forward(ws_pivots)
+                generated_images = self.forward(ws_pivots, camera)
                 loss, l2_loss_val, loss_lpips = self.calc_loss(generated_images, real_images_batch, self.G, use_ball_holder, ws_pivots)
 
                 self.optimizer.zero_grad()
