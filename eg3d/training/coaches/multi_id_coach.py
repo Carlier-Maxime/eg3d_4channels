@@ -9,8 +9,6 @@ class MultiIDCoach(BaseCoach):
         super().__init__(network_pkl, data_loader, device, lr, outdir=outdir)
 
     def train(self, run_name: str, nb_steps: int, limit: int = -1, lpips_threshold: float = 0):
-        self.G.synthesis.train()
-        self.G.mapping.train()
         self._use_ball_holder = True
         self._step = 0
         stop = False
