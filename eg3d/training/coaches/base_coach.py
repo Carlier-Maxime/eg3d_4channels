@@ -28,6 +28,8 @@ class BaseCoach:
         self.outdir = outdir
         os.makedirs(self.outdir, exist_ok=True)
         self.sampling_multiplier = 2
+        self._step = 0
+        self._use_ball_holder = True
 
         self.lpips_loss = LPIPS(net=self.lpips_type).to(self._device).eval()
         self.l2_loss = torch.nn.MSELoss(reduction='mean')
@@ -44,6 +46,24 @@ class BaseCoach:
         self.space_regulizer = SpaceRegulizer(self.original_G, self.lpips_loss, self._device)
         self.optimizer = self.configure_optimizers()
 
+    def train_step(self, imgs: torch.Tensor, ws_pivots: torch.Tensor, camera: torch.Tensor, lpips_threshold: float = 0) -> torch.Tensor | None:
+        imgs = imgs.to(self._device)
+        ws_pivots = ws_pivots.to(self._device)
+        camera = camera.to(self._device)
+        gen_imgs = self.forward(ws_pivots, camera)
+        loss, l2_loss_val, loss_lpips = self.calc_loss(gen_imgs, imgs, self.G, self._use_ball_holder, ws_pivots)
+        assert torch.is_tensor(loss)
+
+        self.optimizer.zero_grad()
+        if loss_lpips <= lpips_threshold:
+            return None
+        loss.backward()
+        self.optimizer.step()
+
+        self._use_ball_holder = self._step % self.locality_regularization_interval == 0
+        self._step += 1
+        return gen_imgs
+
     @abc.abstractmethod
     def train(self, run_name: str, nb_steps: int, limit: int = -1, lpips_threshold: float = 0):
         pass
@@ -52,8 +72,8 @@ class BaseCoach:
         optimizer = torch.optim.Adam(self.G.parameters(), lr=self.lr)
         return optimizer
 
-    def calc_loss(self, generated_images, real_images, new_G, use_ball_holder, w_batch):
-        loss = 0.0
+    def calc_loss(self, generated_images, real_images, new_G, use_ball_holder, w_batch) -> tuple[torch.Tensor, float | None, torch.Tensor | None]:
+        loss = torch.tensor(0., device=generated_images.device, dtype=torch.float)
         l2_loss_val = None
         loss_lpips = None
         if self.l2_lambda > 0:

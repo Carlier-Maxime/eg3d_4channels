@@ -11,28 +11,21 @@ class MultiIDCoach(BaseCoach):
     def train(self, run_name: str, nb_steps: int, limit: int = -1, lpips_threshold: float = 0):
         self.G.synthesis.train()
         self.G.mapping.train()
-        use_ball_holder = True
-
-        i = 0
+        self._use_ball_holder = True
+        self._step = 0
+        stop = False
         for _ in tqdm(range(nb_steps)):
             self.image_counter = 0
             for img_name, imgs, ws_pivots, camera in self.data_loader:
                 if self.image_counter >= limit > 0:
                     break
-
-                real_images_batch = imgs.to(self._device)
-                ws_pivots = ws_pivots.to(self._device)
-                camera = camera.to(self._device)
-                generated_images = self.forward(ws_pivots, camera)
-                loss, l2_loss_val, loss_lpips = self.calc_loss(generated_images, real_images_batch, self.G, use_ball_holder, ws_pivots)
-
-                self.optimizer.zero_grad()
-                loss.backward()
-                self.optimizer.step()
-
-                use_ball_holder = i % self.locality_regularization_interval == 0
-                i += 1
+                gen_imgs = self.train_step(imgs, ws_pivots, camera, lpips_threshold)
+                if gen_imgs is None:
+                    stop = True
+                    break
                 self.image_counter += len(imgs)
+            if stop:
+                break
 
         torch.save(self.G, f'{self.outdir}/model_{run_name}_multi_id.pt')
         for img_name, _, ws_pivots, camera in self.data_loader:
