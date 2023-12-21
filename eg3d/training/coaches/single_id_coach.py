@@ -37,7 +37,7 @@ class SingleIDCoach(BaseCoach):
                 use_ball_holder = i % self.locality_regularization_interval == 0
                 i += 1
 
-            self.image_counter += 1
+            self.image_counter += len(imgs)
 
             save_dict = {
                 'G_ema': self.G.state_dict()
