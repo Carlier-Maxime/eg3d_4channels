@@ -88,7 +88,7 @@ def subprocess_fn(rank, G, image_log_step, repeat_w, num_steps, datasets, batch,
 @click.option('--c_path', help='camera parameters path', type=str, required=True, metavar='STR', show_default=True)
 @click.option('--dataset', help='path to dataset for inverse all images content', type=str, default=None, metavar='STR', show_default=True)
 @click.option('--sample_mult', 'sampling_multiplier', type=float, help='Multiplier for depth sampling in volume rendering', default=2, show_default=True)
-@click.option('--num_steps', 'num_steps', type=int, help='Multiplier for depth sampling in volume rendering', default=500, show_default=True)
+@click.option('--num_steps', 'num_steps', type=int, help='number of steps', default=500, show_default=True)
 @click.option('--img-log-step', 'image_log_step', type=int, help='number of step between image log', default=100, show_default=True)
 @click.option('--nrr', type=int, help='Neural rendering resolution override', default=None, show_default=True)
 @click.option('--batch', type=int, help='batch size, used only with dataset', default=16, show_default=True)
