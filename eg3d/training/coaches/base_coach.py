@@ -1,6 +1,8 @@
 import abc
 import os
 import copy
+import pickle
+
 from training.loss import SpaceRegulizer
 import torch
 from lpips import LPIPS
@@ -9,12 +11,15 @@ import PIL.Image
 
 
 class BaseCoach:
-    def __init__(self, network_pkl: str, data_loader, device: torch.device, lr: float, l2_lambda: float = 1, lpips_lambda: float = 1, use_locality_regularization: bool = False, lpips_type: str = "alex", locality_regularization_interval: int = 1, outdir: str = "output"):
+    def __init__(self, network_pkl: str, data_loader, device: torch.device, lr: float, l2_lambda: float = 1, lpips_lambda: float = 1, loss_lmks_lambda: float = 1, use_locality_regularization: bool = False, lpips_type: str = "alex", locality_regularization_interval: int = 1, outdir: str = "output", network_lmks: str | None = None):
+        self.loss_lmks_lambda = loss_lmks_lambda
         self.optimizer = None
         self.space_regulizer = None
         self.original_G = None
         self.G = None
+        self.lmkDetector = None
         self.network_pkl = network_pkl
+        self.network_lmks = network_lmks
         self.data_loader = data_loader
         self._device = device
         self.lr = lr
@@ -44,6 +49,9 @@ class BaseCoach:
         self.restart_training()
 
     def restart_training(self):
+        if self.network_pkl is not None:
+            with open(self.network_pkl, 'rb') as f:
+                self.lmkDetector = pickle.Unpickler(f).load().to(self._device).requires_grad_(True)
         with open(self.network_pkl, 'rb') as f:
             self.G = legacy.load_network_pkl(f)['G_ema'].to(self._device)  # type: ignore
         self.G.rendering_kwargs['depth_resolution'] = int(self.G.rendering_kwargs['depth_resolution'] * self.sampling_multiplier)
@@ -54,12 +62,13 @@ class BaseCoach:
         self.space_regulizer = SpaceRegulizer(self.original_G, self.lpips_loss, self._device)
         self.optimizer = self.configure_optimizers()
 
-    def train_step(self, imgs: torch.Tensor, ws_pivots: torch.Tensor, camera: torch.Tensor, lpips_threshold: float = 0) -> torch.Tensor | None:
+    def train_step(self, imgs: torch.Tensor, ws_pivots: torch.Tensor, camera: torch.Tensor, pts: torch.Tensor | None, lpips_threshold: float = 0) -> torch.Tensor | None:
         imgs = imgs.to(self._device)
         ws_pivots = ws_pivots.to(self._device)
         camera = camera.to(self._device)
-        gen_imgs = self.forward(ws_pivots, camera)
-        loss, l2_loss_val, loss_lpips = self.calc_loss(gen_imgs, imgs, self.G, self._use_ball_holder, ws_pivots)
+        pts = pts.to(self._device)
+        gen_imgs, gen_lmks = self.forward(ws_pivots, camera)
+        loss, l2_loss_val, loss_lpips, loss_lmks_val = self.calc_loss(gen_imgs, imgs, gen_lmks, pts, self.G, self._use_ball_holder, ws_pivots)
         assert torch.is_tensor(loss)
         if self.tf_events is not None:
             self.tf_events.add_scalar('Loss/loss', loss.item(), self._step)
@@ -67,6 +76,8 @@ class BaseCoach:
                 self.tf_events.add_scalar('Loss/lpips', loss_lpips.item(), self._step)
             if l2_loss_val is not None:
                 self.tf_events.add_scalar('Loss/l2', l2_loss_val, self._step)
+            if loss_lmks_val is not None:
+                self.tf_events.add_scalar('Loss/lmks', loss_lmks_val, self._step)
 
         self.optimizer.zero_grad()
         if loss_lpips <= lpips_threshold:
@@ -76,7 +87,7 @@ class BaseCoach:
 
         self._use_ball_holder = self._step % self.locality_regularization_interval == 0
         self._step += 1
-        return gen_imgs
+        return gen_imgs, gen_lmks
 
     @abc.abstractmethod
     def train(self, run_name: str, nb_steps: int, limit: int = -1, lpips_threshold: float = 0, **kwargs):
@@ -86,10 +97,11 @@ class BaseCoach:
         optimizer = torch.optim.Adam(self.G.parameters(), lr=self.lr)
         return optimizer
 
-    def calc_loss(self, generated_images, real_images, new_G, use_ball_holder, w_batch) -> tuple[torch.Tensor, float | None, torch.Tensor | None]:
+    def calc_loss(self, generated_images, real_images, gen_lmks, lmks, new_G, use_ball_holder, w_batch) -> tuple[torch.Tensor, float | None, torch.Tensor | None, float | None]:
         loss = torch.tensor(0., device=generated_images.device, dtype=torch.float)
         l2_loss_val = None
         loss_lpips = None
+        loss_lmks_val = None
         if self.l2_lambda > 0:
             l2_loss_val = self.l2_loss(generated_images, real_images)
             loss += l2_loss_val * self.l2_lambda
@@ -100,10 +112,15 @@ class BaseCoach:
         if use_ball_holder and self.use_locality_regularization:
             ball_holder_loss_val = self.space_regulizer.space_regulizer_loss(new_G, w_batch)
             loss += ball_holder_loss_val
-        return loss, l2_loss_val, loss_lpips
+        if gen_lmks is not None:
+            loss_lmks_val = self.l2_loss(gen_lmks, lmks)
+            loss += loss_lmks_val * self.loss_lmks_lambda
+        return loss, l2_loss_val, loss_lpips, loss_lmks_val
 
     def forward(self, ws, c):
-        return self.G.synthesis(ws, c, noise_mode='const')['image']
+        planes = self.G.backbone.synthesis(ws)
+        gen_lmks = self.lmkDetector(planes) if self.lmkDetector is not None else None
+        return self.G.synthesis(ws, c, planes=planes, noise_mode='const')['image'], gen_lmks
 
     def save_preview(self, run_name: str, name: str, gen_img: torch.Tensor):
         preview_path = f'{self.outdir}/{run_name}/preview_for_{name}.png'

@@ -57,7 +57,7 @@ class TriPlaneGenerator(torch.nn.Module):
             c = torch.zeros_like(c)
         return self.backbone.mapping(z, c * self.rendering_kwargs.get('c_scale', 0), truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff, update_emas=update_emas)
 
-    def features(self, ws, c, neural_rendering_resolution=None, update_emas=False, cache_backbone=False, use_cached_backbone=False, **synthesis_kwargs):
+    def features(self, ws, c, neural_rendering_resolution=None, update_emas=False, cache_backbone=False, use_cached_backbone=False, planes: torch.Tensor | None = None, **synthesis_kwargs):
         cam2world_matrix = c[:, :16].view(-1, 4, 4)
         intrinsics = c[:, 16:25].view(-1, 3, 3)
 
@@ -71,12 +71,13 @@ class TriPlaneGenerator(torch.nn.Module):
 
         # Create triplanes by running StyleGAN backbone
         N, M, _ = ray_origins.shape
-        if use_cached_backbone and self._last_planes is not None:
-            planes = self._last_planes
-        else:
-            planes = self.backbone.synthesis(ws, update_emas=update_emas, **synthesis_kwargs)
-        if cache_backbone:
-            self._last_planes = planes
+        if planes is None:
+            if use_cached_backbone and self._last_planes is not None:
+                planes = self._last_planes
+            else:
+                planes = self.backbone.synthesis(ws, update_emas=update_emas, **synthesis_kwargs)
+            if cache_backbone:
+                self._last_planes = planes
 
         # Reshape output into three 32-channel planes
         planes = planes.view(len(planes), 3, 32, planes.shape[-2], planes.shape[-1])
@@ -89,13 +90,12 @@ class TriPlaneGenerator(torch.nn.Module):
         depth_image = depth_samples.permute(0, 2, 1).reshape(N, 1, H, W)
         return feature_image, depth_image
 
-    def synthesis(self, ws, c, neural_rendering_resolution=None, update_emas=False, cache_backbone=False, use_cached_backbone=False, **synthesis_kwargs):
-        feature_image, depth_image = self.features(ws, c, neural_rendering_resolution, update_emas, cache_backbone, use_cached_backbone, **synthesis_kwargs)
+    def synthesis(self, ws, c, neural_rendering_resolution=None, update_emas=False, cache_backbone=False, use_cached_backbone=False, planes: torch.Tensor | None = None, **synthesis_kwargs):
+        feature_image, depth_image = self.features(ws, c, neural_rendering_resolution, update_emas, cache_backbone, use_cached_backbone, planes=planes, **synthesis_kwargs)
 
         # Run superresolution to get final image
         image_raw = feature_image[:, :self.img_channels]
         sr_image = self.superresolution(image_raw, feature_image, ws, noise_mode=self.rendering_kwargs['superresolution_noise_mode'], **{k: synthesis_kwargs[k] for k in synthesis_kwargs.keys() if k != 'noise_mode'})
-
         return {'image': sr_image, 'image_raw': image_raw, 'image_depth': depth_image}
 
     def sample(self, coordinates, directions, z, c, truncation_psi=1, truncation_cutoff=None, update_emas=False, **synthesis_kwargs):

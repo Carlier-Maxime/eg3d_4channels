@@ -28,10 +28,10 @@ class MultiIDCoach(BaseCoach):
             self.tf_events = self.tensorboard.SummaryWriter(log_dir=f"{self.outdir}/{run_name}")
         for i in tqdm(range(nb_steps)):
             self.image_counter = 0
-            for img_name, imgs, ws_pivots, camera in self.data_loader:
+            for img_name, imgs, ws_pivots, camera, pts in self.data_loader:
                 if self.image_counter >= limit > 0:
                     break
-                gen_imgs = self.train_step(imgs, ws_pivots, camera, lpips_threshold)
+                gen_imgs, gen_lmks = self.train_step(imgs, ws_pivots, camera, pts, lpips_threshold)
                 if gen_imgs is None:
                     stop = True
                     break

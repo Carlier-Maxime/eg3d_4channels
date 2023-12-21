@@ -13,6 +13,7 @@ from training.dataset import ImageAndNumpyFolderDataset
 @click.command()
 @click.option('--network', type=str, required=True, help='Network pkl file')
 @click.option('--dataset', type=str, required=True, help='Dataset path : the dataset content images and latents')
+@click.option('--network-lmks', type=str, default=None, help='Network pkl file for landmark detector')
 @click.option('--outdir', type=str, default="output", help='The output directory')
 @click.option('--force-rgb', type=bool, default=False, is_flag=True, help='force RGB images')
 @click.option('--run_name', type=str, default=''.join(choice(ascii_uppercase) for i in range(12)), help='run name, is used for saving results')
@@ -28,7 +29,15 @@ def run_PTI(**kwargs):
     opts = dnnlib.EasyDict(kwargs)
     dataset = ImageAndNumpyFolderDataset(opts.dataset, force_rgb=opts.force_rgb, use_labels=True)
     dataloader = DataLoader(dataset, batch_size=opts.batch, shuffle=False)
-    coach = MultiIDCoach(opts.network, dataloader, opts.device, opts.lr, outdir=opts.outdir) if opts.use_multi_id else SingleIDCoach(opts.network, dataloader, opts.device, opts.lr, outdir=opts.outdir)
+    coach_args = {
+        "network_pkl": opts.network,
+        "data_loader": dataloader,
+        "device": opts.device,
+        "lr": opts.lr,
+        "outdir": opts.outdir,
+        "network_lmks": opts.networks_lmks
+    }
+    coach = MultiIDCoach(**coach_args) if opts.use_multi_id else SingleIDCoach(**coach_args)
     coach.train(opts.run_name, opts.num_steps, limit=opts.limit, snapshot_step=opts.snapshot_step)
     return opts.run_name
 

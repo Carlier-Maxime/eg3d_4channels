@@ -14,14 +14,14 @@ class SingleIDCoach(BaseCoach):
         self._step = 0
         if self.tensorboard is not None:
             self.tf_events = self.tensorboard.SummaryWriter(log_dir=f"{self.outdir}/{run_name}")
-        for img_name, imgs, ws_pivots, camera in tqdm(self.data_loader):
+        for img_name, imgs, ws_pivots, camera, pts in tqdm(self.data_loader):
             self.restart_training()
             if self.image_counter >= limit > 0:
                 break
 
             gen_imgs = []
             for _ in tqdm(range(nb_steps)):
-                gen_imgs = self.train_step(imgs, ws_pivots, camera, lpips_threshold)
+                gen_imgs, gen_lmks = self.train_step(imgs, ws_pivots, camera, pts, lpips_threshold)
                 if gen_imgs is None:
                     break
             self.image_counter += len(imgs)
