@@ -320,6 +320,6 @@ class ImageAndNumpyFolderDataset(ImageFolderDataset):
         img = torch.from_numpy(img[:3] if self._force_rgb else img)
         mean = torch.tensor([0.5, 0.5, 0.5])
         img = ((img.float() / 255.0) - mean[:, None, None]) / mean[:, None, None]
-        return self._image_fnames[idx].split(".")[0], img, data, c
+        return self._image_fnames[idx].split(".")[0].split("/")[-1], img, data, c
 
 # ----------------------------------------------------------------------------
