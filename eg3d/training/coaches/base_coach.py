@@ -33,6 +33,14 @@ class BaseCoach:
 
         self.lpips_loss = LPIPS(net=self.lpips_type).to(self._device).eval()
         self.l2_loss = torch.nn.MSELoss(reduction='mean')
+
+        self.tf_events = None
+        try:
+            import torch.utils.tensorboard as tensorboard
+        except ImportError:
+            tensorboard = None
+            print("skipped : tensorboard, module not found")
+        self.tensorboard = tensorboard
         self.restart_training()
 
     def restart_training(self):
@@ -53,6 +61,12 @@ class BaseCoach:
         gen_imgs = self.forward(ws_pivots, camera)
         loss, l2_loss_val, loss_lpips = self.calc_loss(gen_imgs, imgs, self.G, self._use_ball_holder, ws_pivots)
         assert torch.is_tensor(loss)
+        if self.tf_events is not None:
+            self.tf_events.add_scalar('Loss/loss', loss.item(), self._step)
+            if loss_lpips is not None:
+                self.tf_events.add_scalar('Loss/lpips', loss_lpips.item(), self._step)
+            if l2_loss_val is not None:
+                self.tf_events.add_scalar('Loss/l2', l2_loss_val, self._step)
 
         self.optimizer.zero_grad()
         if loss_lpips <= lpips_threshold:

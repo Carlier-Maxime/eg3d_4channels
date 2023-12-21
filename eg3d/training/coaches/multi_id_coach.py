@@ -14,6 +14,8 @@ class MultiIDCoach(BaseCoach):
         self._use_ball_holder = True
         self._step = 0
         stop = False
+        if self.tensorboard is not None:
+            self.tf_events = self.tensorboard.SummaryWriter(log_dir=f"{self.outdir}/{run_name}")
         for _ in tqdm(range(nb_steps)):
             self.image_counter = 0
             for img_name, imgs, ws_pivots, camera in self.data_loader:

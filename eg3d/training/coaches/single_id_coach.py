@@ -12,6 +12,8 @@ class SingleIDCoach(BaseCoach):
         os.makedirs(f'{self.outdir}/{run_name}', exist_ok=True)
         self._use_ball_holder = True
         self._step = 0
+        if self.tensorboard is not None:
+            self.tf_events = self.tensorboard.SummaryWriter(log_dir=f"{self.outdir}/{run_name}")
         for img_name, imgs, ws_pivots, camera in tqdm(self.data_loader):
             self.restart_training()
             if self.image_counter >= limit > 0:
