@@ -7,7 +7,7 @@ from training.networks_stylegan2 import DiscriminatorEpilogue, DiscriminatorBloc
 
 
 @persistence.persistent_class
-class LandmarkDetector(torch.nn.Module):
+class LandmarkDetector(nn.Module):
     def __init__(self,
                  nb_pts,
                  img_resolution,  # Input resolution.
@@ -63,58 +63,74 @@ class LandmarkDetector(torch.nn.Module):
 @persistence.persistent_class
 class LandmarkDetectorExperience(nn.Module):
     def __init__(self,
-                 nb_pts,
+                 nb_pts,  # Number of points
                  img_resolution,  # Input resolution.
                  img_channels,  # Number of input color channels.
-                 architecture='resnet',  # Architecture: 'orig', 'skip', 'resnet'.
-                 channel_base=32768,  # Overall multiplier for the number of channels.
-                 channel_max=512,  # Maximum number of channels in any layer.
-                 num_fp16_res=4,  # Use FP16 for the N highest resolutions.
-                 conv_clamp=256,  # Clamp the output of convolution layers to +-X, None = disable clamping.
-                 block_kwargs=None,  # Arguments for DiscriminatorBlock.
-                 epilogue_kwargs=None,  # Arguments for DiscriminatorEpilogue.
+                 **_
                  ):
         super().__init__()
+        embed_pooling = []
+        res = img_resolution
+        assert (res & (res-1)) == 0 and res != 0, "img resolution is not a 2^x. Not supported"
+        while res > 256:
+            embed_pooling += [nn.MaxPool2d(kernel_size=2, stride=2), nn.Conv2d(img_channels, img_channels, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True)]
+            res >>= 1
+        self.embed = nn.Sequential(
+            nn.Conv2d(img_channels, img_channels, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True),
+            *embed_pooling,
+            nn.Conv2d(img_channels, 128, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True),
+        )
+
+        to64res = []
+        while res > 64:
+            to64res += [nn.Conv2d(128, 128, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True), nn.MaxPool2d(kernel_size=2, stride=2)]
+            res >>= 1
+        self.to64res = nn.Sequential(*to64res)
+
+        def channelsUp(input_channels: int, pool2D: bool = False) -> list[nn.Module]:
+            sequence = [
+                nn.Conv2d(input_channels, input_channels, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True),
+                nn.Conv2d(input_channels, input_channels*2, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True)
+            ]
+            if pool2D:
+                sequence += [nn.Conv2d(input_channels*2, input_channels*2, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True), nn.MaxPool2d(kernel_size=2, stride=2)]
+            return sequence
+
+        to8res = []
+        while res > 8:
+            to8res += [nn.Conv2d(512, 512, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True), nn.MaxPool2d(kernel_size=2, stride=2)]
+            res >>= 1
+
         self.features = nn.Sequential(
-            nn.Conv2d(96, 96, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True),
-            nn.Conv2d(96, 128, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True),
-            nn.Conv2d(128, 128, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            nn.Conv2d(128, 128, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            nn.Conv2d(128, 128, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True),
-            nn.Conv2d(128, 256, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True),
-            nn.Conv2d(256, 256, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            nn.Conv2d(256, 256, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True),
-            nn.Conv2d(256, 512, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True),
-            nn.Conv2d(512, 512, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            nn.Conv2d(512, 512, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            nn.Conv2d(512, 512, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True),
-            nn.Conv2d(512, 1024, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True),
-            nn.Conv2d(1024, 1024, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=2),
+            *channelsUp(128, res > 32),
+            *channelsUp(256, res > 16),
+            *to8res,
+            *channelsUp(512, res > 4),
             nn.Conv2d(1024, 1024, kernel_size=3, dilation=1, padding=1))
+        res = min(res, 4)
 
-        """self.CPM_feature = nn.Sequential(
-            nn.Conv2d(512, 256, kernel_size=3, padding=1), nn.ReLU(inplace=True),  # CPM_1
-            nn.Conv2d(256, 128, kernel_size=3, padding=1), nn.ReLU(inplace=True))  # CPM_2
+        pow2_pts = 1 << (int(np.log2(nb_pts*3)) + 2)
+        toPow2_pts = []
+        channels = 1024
+        while channels < pow2_pts:
+            toPow2_pts.append(nn.Conv2d(channels, channels << 1, kernel_size=3, dilation=1, padding=1))
+            toPow2_pts.append(nn.ReLU(inplace=True))
+            channels <<= 1
+            toPow2_pts.append(nn.Conv2d(channels, channels, kernel_size=3, dilation=1, padding=1))
+            toPow2_pts.append(nn.ReLU(inplace=True))
+        self.toPow2_pts = nn.Sequential(*toPow2_pts)
 
-        self.stage1 = nn.Sequential(
-            nn.Conv2d(128, 128, kernel_size=3, padding=1), nn.ReLU(inplace=True),
-            nn.Conv2d(128, 128, kernel_size=3, padding=1), nn.ReLU(inplace=True),
-            nn.Conv2d(128, 256, kernel_size=1, padding=0), nn.ReLU(inplace=True),
-            nn.Conv2d(256, 105, kernel_size=1, padding=0))"""
         self.fc_layers = nn.Sequential(
-            nn.Linear(1024 * 4 * 4, 1024), nn.ReLU(inplace=True),
-            nn.Linear(1024, 1024), nn.ReLU(inplace=True),
-            nn.Linear(1024, 105 * 3)
+            nn.Linear(channels * res * res, pow2_pts), nn.ReLU(inplace=True),
+            nn.Linear(pow2_pts, pow2_pts), nn.ReLU(inplace=True),
+            nn.Linear(pow2_pts, nb_pts * 3)
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.embed(x)
+        x = self.to64res(x)
         x = self.features(x)
+        x = self.toPow2_pts(x)
         x = x.view(x.shape[0], -1)
         x = self.fc_layers(x)
         return x.reshape(x.shape[0], x.shape[1] // 3, -1)
