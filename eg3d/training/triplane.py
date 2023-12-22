@@ -52,7 +52,7 @@ class TriPlaneGenerator(torch.nn.Module):
 
         self._last_planes = None
 
-    def mapping(self, z, c, truncation_psi=1, truncation_cutoff=None, update_emas=False):
+    def mapping(self, z, c, truncation_psi=1, truncation_cutoff=None, update_emas=False, **_):
         if self.rendering_kwargs['c_gen_conditioning_zero']:
             c = torch.zeros_like(c)
         return self.backbone.mapping(z, c * self.rendering_kwargs.get('c_scale', 0), truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff, update_emas=update_emas)
