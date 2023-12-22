@@ -150,7 +150,7 @@ def training_loop(
         data_loader_kwargs = {}
     if training_set_kwargs is None:
         training_set_kwargs = {}
-    if local_rank==-1:
+    if local_rank == -1:
         local_rank = rank
     start_time = time.time()
     device = torch.device('cuda', local_rank if num_gpus > 1 else single_gpu_index)
