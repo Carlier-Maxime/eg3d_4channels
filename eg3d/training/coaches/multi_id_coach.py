@@ -12,7 +12,7 @@ class MultiIDCoach(BaseCoach):
 
     def save_snapshot(self, run_name: str, current_step: int, nb_steps: int, final: bool = False):
         torch.save(self.G, f'{self.outdir}/{run_name}/{"final" if final else "snapshot"}_model_{run_name}_multi_id_{current_step}_of_{nb_steps}PTI.pt')
-        torch.save(self.G, f'{self.outdir}/{run_name}/{"final" if final else "snapshot"}_model_{run_name}_lmks_{current_step}_of_{nb_steps}PTI.pt')
+        torch.save(self.lmkDetector, f'{self.outdir}/{run_name}/{"final" if final else "snapshot"}_model_{run_name}_lmks_{current_step}_of_{nb_steps}PTI.pt')
         os.makedirs(f'{self.outdir}/{run_name}/{current_step}_PTI', exist_ok=True)
         for img_name, _, ws_pivots, camera, _ in self.data_loader:
             ws_pivots = ws_pivots.to(self._device)
