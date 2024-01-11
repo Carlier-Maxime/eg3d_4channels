@@ -56,8 +56,8 @@ class BaseCoach:
                 self.lmkDetector = pickle.Unpickler(f).load().to(self._device).requires_grad_(True)
         with open(self.network_pkl, 'rb') as f:
             G = legacy.load_network_pkl(f)['G_ema'].to(self._device)  # type: ignore
-            self.G = Generator(**G.init_kwargs).to(self._device)
-            misc.copy_params_and_buffers(G, self.G, require_all=False)
+            self.G = Generator(**G.init_kwargs).requires_grad_(False).to(self._device)
+            misc.copy_params_and_buffers(G, self.G if list(G.named_parameters())[0][0].startswith("triplane.") else self.G.triplane, require_all=False)
         self.G.rendering_kwargs['depth_resolution'] = int(self.G.rendering_kwargs['depth_resolution'] * self.sampling_multiplier)
         self.G.rendering_kwargs['depth_resolution_importance'] = int(self.G.rendering_kwargs['depth_resolution_importance'] * self.sampling_multiplier)
         for p in self.G.parameters():
