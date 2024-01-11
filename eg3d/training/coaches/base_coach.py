@@ -49,8 +49,8 @@ class BaseCoach:
         self.restart_training()
 
     def restart_training(self):
-        if self.network_pkl is not None:
-            with open(self.network_pkl, 'rb') as f:
+        if self.network_lmks is not None:
+            with open(self.network_lmks, 'rb') as f:
                 self.lmkDetector = pickle.Unpickler(f).load().to(self._device).requires_grad_(True)
         with open(self.network_pkl, 'rb') as f:
             self.G = legacy.load_network_pkl(f)['G_ema'].to(self._device)  # type: ignore
@@ -81,7 +81,7 @@ class BaseCoach:
 
         self.optimizer.zero_grad()
         if loss_lpips <= lpips_threshold:
-            return None
+            return None, None
         loss.backward()
         self.optimizer.step()
 

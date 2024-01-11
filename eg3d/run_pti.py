@@ -27,7 +27,7 @@ from training.dataset import ImageAndNumpyFolderDataset
 @click.option('--lr', type=float, default=3e-4, help='learning rate')
 def run_PTI(**kwargs):
     opts = dnnlib.EasyDict(kwargs)
-    dataset = ImageAndNumpyFolderDataset(opts.dataset, force_rgb=opts.force_rgb, use_labels=True)
+    dataset = ImageAndNumpyFolderDataset(opts.dataset, force_rgb=opts.force_rgb, use_labels=True, require_pts=opts.network_lmks is not None)
     dataloader = DataLoader(dataset, batch_size=opts.batch, shuffle=False)
     coach_args = {
         "network_pkl": opts.network,
@@ -35,7 +35,7 @@ def run_PTI(**kwargs):
         "device": opts.device,
         "lr": opts.lr,
         "outdir": opts.outdir,
-        "network_lmks": opts.networks_lmks
+        "network_lmks": opts.network_lmks
     }
     coach = MultiIDCoach(**coach_args) if opts.use_multi_id else SingleIDCoach(**coach_args)
     coach.train(opts.run_name, opts.num_steps, limit=opts.limit, snapshot_step=opts.snapshot_step)

@@ -5,8 +5,8 @@ from training.coaches.base_coach import BaseCoach
 
 
 class SingleIDCoach(BaseCoach):
-    def __init__(self, network_pkl: str, data_loader, device: torch.device, lr: float, outdir: str = "output"):
-        super().__init__(network_pkl, data_loader, device, lr, outdir=outdir)
+    def __init__(self, network_pkl: str, data_loader, device: torch.device, lr: float, outdir: str = "output", network_lmks: str | None = None):
+        super().__init__(network_pkl, data_loader, device, lr, outdir=outdir, network_lmks=network_lmks)
 
     def train(self, run_name: str, nb_steps: int, limit: int = -1, lpips_threshold: float = 0, **kwargs):
         os.makedirs(f'{self.outdir}/{run_name}', exist_ok=True)
@@ -27,10 +27,10 @@ class SingleIDCoach(BaseCoach):
             self.image_counter += len(imgs)
 
             save_dict = {
-                'G_ema': self.G.state_dict()
+                'G_ema': self.G.state_dict(),
+                'G_lmks': self.lmkDetector.state_dict()
             }
 
             for name, gen_img in zip(img_name, gen_imgs):
-                save_path = f'{self.outdir}/{run_name}/model_for_{name}.pth'
-                torch.save(save_dict, save_path)
+                torch.save(save_dict, f'{self.outdir}/{run_name}/model_for_{name}.pth')
                 self.save_preview(run_name, name, gen_img)

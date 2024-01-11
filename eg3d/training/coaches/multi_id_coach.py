@@ -7,11 +7,12 @@ from training.coaches.base_coach import BaseCoach
 
 class MultiIDCoach(BaseCoach):
 
-    def __init__(self, network_pkl: str, data_loader, device: torch.device, lr: float, outdir: str = "output"):
-        super().__init__(network_pkl, data_loader, device, lr, outdir=outdir)
+    def __init__(self, network_pkl: str, data_loader, device: torch.device, lr: float, outdir: str = "output", network_lmks: str | None = None):
+        super().__init__(network_pkl, data_loader, device, lr, outdir=outdir, network_lmks=network_lmks)
 
     def save_snapshot(self, run_name: str, current_step: int, nb_steps: int, final: bool = False):
         torch.save(self.G, f'{self.outdir}/{run_name}/{"final" if final else "snapshot"}_model_{run_name}_multi_id_{current_step}_of_{nb_steps}PTI.pt')
+        torch.save(self.G, f'{self.outdir}/{run_name}/{"final" if final else "snapshot"}_model_{run_name}_lmks_{current_step}_of_{nb_steps}PTI.pt')
         os.makedirs(f'{self.outdir}/{run_name}/{current_step}_PTI', exist_ok=True)
         for img_name, _, ws_pivots, camera in self.data_loader:
             ws_pivots = ws_pivots.to(self._device)
