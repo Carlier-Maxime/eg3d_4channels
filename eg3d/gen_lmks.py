@@ -4,8 +4,6 @@ import click
 import numpy as np
 import torch
 
-import dnnlib
-import legacy
 from dnnlib import EasyDict
 from training.landmarkDetection import LandmarkDetector
 
