@@ -14,6 +14,15 @@ from training.dataset import NumpyFolderDataset
 from training.landmarkDetection import LandmarkDetector, LandmarkDetectorExperience
 
 
+def createLmkDetector(opts):
+    args = [opts.nb_pts, opts.features_res, opts.channels]
+    if opts.detector_type == 'exp':
+        lmkDetector = LandmarkDetectorExperience(*args)
+    else:
+        lmkDetector = LandmarkDetector(*args)
+    return lmkDetector.to(opts.device)
+
+
 @click.command()
 # Required.
 @click.option('--data', help='Training data', metavar='[ZIP|DIR]', type=str, required=True)
@@ -28,6 +37,9 @@ from training.landmarkDetection import LandmarkDetector, LandmarkDetectorExperie
 @click.option('--to-pth', help='save a network to pth file', type=bool, is_flag=True, default=False, show_default=True)
 @click.option('--no-tensorboard', help='disable tensorboard', type=bool, is_flag=True, default=False, show_default=True)
 @click.option('--detector-type', help='type of landmark detector used', type=click.Choice(['std', 'exp']), default='std', show_default=True)
+@click.option('--nb-pts', help='Number of points', metavar='INT', type=click.IntRange(min=1), default=105, show_default=True)
+@click.option('--features-res', help='Features Resolution', metavar='INT', type=click.IntRange(min=1), default=256, show_default=True)
+@click.option('--channels', help='Features Channels', metavar='INT', type=click.IntRange(min=1), default=96, show_default=True)
 def main(**kwargs):
     opts = EasyDict(kwargs)
     dataset = NumpyFolderDataset(opts.data)
@@ -35,10 +47,7 @@ def main(**kwargs):
     if opts.resume is not None:
         print(f"Resume from {opts.resume}...", end="")
         if opts.resume.endswith('.pth'):
-            if opts.detector_type == 'exp':
-                lmkDetector = LandmarkDetectorExperience(105, 256, 96).to(opts.device)
-            else:
-                lmkDetector = LandmarkDetector(105, 256, 96).to(opts.device)
+            lmkDetector = createLmkDetector(opts)
             w = torch.load(opts.resume)
             lmkDetector.load_state_dict(w)
         else:
@@ -47,10 +56,7 @@ def main(**kwargs):
         print(" Done")
     else:
         print("Create Network...", end='')
-        if opts.detector_type == 'exp':
-            lmkDetector = LandmarkDetectorExperience(105, 256, 96).to(opts.device)
-        else:
-            lmkDetector = LandmarkDetector(105, 256, 96).to(opts.device)
+        lmkDetector = createLmkDetector(opts)
         print(" Done")
     tf_events = None
     try:
