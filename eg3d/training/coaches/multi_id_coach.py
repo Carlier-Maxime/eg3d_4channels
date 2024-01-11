@@ -14,11 +14,11 @@ class MultiIDCoach(BaseCoach):
         torch.save(self.G, f'{self.outdir}/{run_name}/{"final" if final else "snapshot"}_model_{run_name}_multi_id_{current_step}_of_{nb_steps}PTI.pt')
         torch.save(self.G, f'{self.outdir}/{run_name}/{"final" if final else "snapshot"}_model_{run_name}_lmks_{current_step}_of_{nb_steps}PTI.pt')
         os.makedirs(f'{self.outdir}/{run_name}/{current_step}_PTI', exist_ok=True)
-        for img_name, _, ws_pivots, camera in self.data_loader:
+        for img_name, _, ws_pivots, camera, _ in self.data_loader:
             ws_pivots = ws_pivots.to(self._device)
             camera = camera.to(self._device)
-            generated_images = self.forward(ws_pivots, camera)
-            for name, gen_img in zip(img_name, generated_images):
+            gen_imgs, gen_lmks = self.forward(ws_pivots, camera)
+            for name, gen_img in zip(img_name, gen_imgs):
                 self.save_preview(f'{run_name}/{current_step}_PTI', name, gen_img)
 
     def train(self, run_name: str, nb_steps: int, limit: int = -1, lpips_threshold: float = 0, snapshot_step: int = 100, **kwargs):
