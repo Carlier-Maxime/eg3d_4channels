@@ -4,6 +4,8 @@ import click
 import numpy as np
 import torch
 
+import dnnlib
+import legacy
 from dnnlib import EasyDict
 from training.landmarkDetection import LandmarkDetector
 
@@ -23,6 +25,8 @@ def main(**kwargs):
         lmkDetector = LandmarkDetector(105, 256, 96).to(opts.device)
         w = torch.load(opts.network)
         lmkDetector.load_state_dict(w)
+    elif opts.network.endswith('.pt'):
+        lmkDetector = torch.load(opts.network).to(opts.device)
     else:
         with open(opts.network, 'rb') as f:
             lmkDetector = pickle.Unpickler(f).load().to(opts.device)
