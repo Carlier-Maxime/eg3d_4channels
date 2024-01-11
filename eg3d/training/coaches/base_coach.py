@@ -98,7 +98,7 @@ class BaseCoach:
         pass
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.G.parameters(), lr=self.lr)
+        optimizer = torch.optim.Adam((list(self.G.parameters()) + list(self.lmkDetector.parameters())) if self.lmkDetector is not None else self.G.parameters, lr=self.lr)
         return optimizer
 
     def calc_loss(self, generated_images, real_images, gen_lmks, lmks, new_G, use_ball_holder, w_batch) -> tuple[torch.Tensor, float | None, torch.Tensor | None, float | None]:
