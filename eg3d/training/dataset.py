@@ -308,14 +308,20 @@ class NumpyFolderDataset(torch.utils.data.Dataset):
 
 
 class ImageAndNumpyFolderDataset(ImageFolderDataset):
-    def __init__(self, path: str, force_rgb: bool = False, **super_kwargs):
+    def __init__(self, path: str, force_rgb: bool = False, require_pts=False, **super_kwargs):
         super().__init__(path, resolution=None, force_rgb=force_rgb, **super_kwargs)
         self._numpy_fnames = sorted(fname for fname in self._all_fnames if self._file_ext(fname) in ['.npy'])
-        self._pts_fnames = sorted(fname for fname in self._all_fnames if self._file_ext(fname) in ['.pts'])
+        self._require_pts = require_pts
         if len(self._numpy_fnames) != len(self._image_fnames):
             raise IOError('No same number of numpy files and images files in the specified path')
-        if len(self._pts_fnames) != len(self._image_fnames) and len(self._pts_fnames) != 0:
-            raise IOError('No same number of pts files and images files in the specified path')
+        if require_pts:
+            self._pts_fnames = sorted(fname for fname in self._all_fnames if self._file_ext(fname) in ['.pts'])
+            if len(self._pts_fnames) == 0:
+                raise IOError('pts files is required')
+            if len(self._pts_fnames) != len(self._image_fnames):
+                raise IOError('No same number of pts files and images files in the specified path')
+        else:
+            self._pts_fnames = None
 
     def __getitem__(self, idx):
         img, c = super().__getitem__(idx)
@@ -323,9 +329,10 @@ class ImageAndNumpyFolderDataset(ImageFolderDataset):
         img = torch.from_numpy(img[:3] if self._force_rgb else img)
         mean = torch.tensor([0.5, 0.5, 0.5])
         img = ((img.float() / 255.0) - mean[:, None, None]) / mean[:, None, None]
+        img_name = self._image_fnames[idx].split(".")[0].split("/")[-1]
         pts = None
-        if len(self._pts_fnames) > 0:
+        if self._require_pts:
             pts = torch.from_numpy(np.load(f'{self._path}/{self._pts_fnames[idx]}'))
-        return self._image_fnames[idx].split(".")[0].split("/")[-1], img, data, c, pts
+        return img_name, img, data, c, pts
 
 # ----------------------------------------------------------------------------
