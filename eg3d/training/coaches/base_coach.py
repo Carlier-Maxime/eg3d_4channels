@@ -3,6 +3,8 @@ import os
 import copy
 import pickle
 
+from torch_utils import misc
+from training.generator import Generator
 from training.loss import SpaceRegulizer
 import torch
 from lpips import LPIPS
@@ -53,7 +55,9 @@ class BaseCoach:
             with open(self.network_lmks, 'rb') as f:
                 self.lmkDetector = pickle.Unpickler(f).load().to(self._device).requires_grad_(True)
         with open(self.network_pkl, 'rb') as f:
-            self.G = legacy.load_network_pkl(f)['G_ema'].to(self._device)  # type: ignore
+            G = legacy.load_network_pkl(f)['G_ema'].to(self._device)  # type: ignore
+            self.G = Generator(**G.init_kwargs).to(self._device)
+            misc.copy_params_and_buffers(G, self.G, require_all=False)
         self.G.rendering_kwargs['depth_resolution'] = int(self.G.rendering_kwargs['depth_resolution'] * self.sampling_multiplier)
         self.G.rendering_kwargs['depth_resolution_importance'] = int(self.G.rendering_kwargs['depth_resolution_importance'] * self.sampling_multiplier)
         for p in self.G.parameters():
