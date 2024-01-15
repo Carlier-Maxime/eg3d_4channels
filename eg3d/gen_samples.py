@@ -73,6 +73,7 @@ def make_transform(translate: Tuple[float, float], angle: float):
 @click.option('--planes', 'save_planes', help='Save Planes into npy file', type=bool, required=False, metavar='BOOL', default=False, show_default=True, is_flag=True)
 @click.option('--reload_modules', help='Overload persistent modules?', type=bool, required=False, metavar='BOOL', default=False, show_default=True)
 @click.option('--random-camera', help='Use a random camera', type=bool, required=False, metavar='BOOL', default=False, show_default=True, is_flag=True)
+@click.option('--single-camera', help='single camera', type=bool, required=False, metavar='BOOL', default=False, show_default=True, is_flag=True)
 def generate_images(
         network_pkl: str,
         seeds: List[int],
@@ -85,7 +86,8 @@ def generate_images(
         shape_format: str,
         save_planes: bool,
         reload_modules: bool,
-        random_camera: bool
+        random_camera: bool,
+        single_camera: bool
 ):
     """Generate images using pretrained network pickle.
 
@@ -133,9 +135,9 @@ def generate_images(
         imgs = []
         angle_p = -0.2
         if random_camera:
-            angles = (torch.rand((3, 2), device=device) * 2 - 1) * torch.pi / 6
+            angles = (torch.rand((1 if single_camera else 3, 2), device=device) * 2 - 1) * torch.pi / 6
         else:
-            angles = [(.4, angle_p), (0, angle_p), (-.4, angle_p)]
+            angles = [(0, angle_p)] if single_camera else [(.4, angle_p), (0, angle_p), (-.4, angle_p)]
         for angle_y, angle_p in angles:
             cam2world_pose = LookAtPoseSampler.sample(np.pi / 2 + angle_y, np.pi / 2 + angle_p, cam_pivot, radius=cam_radius, device=device)
             camera_params = torch.cat([cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
