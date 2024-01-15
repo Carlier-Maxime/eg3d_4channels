@@ -74,6 +74,7 @@ def make_transform(translate: Tuple[float, float], angle: float):
 @click.option('--reload_modules', help='Overload persistent modules?', type=bool, required=False, metavar='BOOL', default=False, show_default=True)
 @click.option('--random-camera', help='Use a random camera', type=bool, required=False, metavar='BOOL', default=False, show_default=True, is_flag=True)
 @click.option('--single-camera', help='single camera', type=bool, required=False, metavar='BOOL', default=False, show_default=True, is_flag=True)
+@click.option('--mapped-latents', help='Save mapped latents', type=bool, required=False, metavar='BOOL', default=False, show_default=True, is_flag=True)
 def generate_images(
         network_pkl: str,
         seeds: List[int],
@@ -87,7 +88,8 @@ def generate_images(
         save_planes: bool,
         reload_modules: bool,
         random_camera: bool,
-        single_camera: bool
+        single_camera: bool,
+        mapped_latents: bool
 ):
     """Generate images using pretrained network pickle.
 
@@ -111,7 +113,13 @@ def generate_images(
         G.neural_rendering_resolution = G_data.neural_rendering_resolution
         G.rendering_kwargs = G_data.rendering_kwargs
 
+    outdir_ws = f'{outdir}/mapped_latents'
+    outdir_planes = f'{outdir}/planes'
     os.makedirs(outdir, exist_ok=True)
+    if mapped_latents:
+        os.makedirs(outdir_ws, exist_ok=True)
+    if save_planes:
+        os.makedirs(outdir_planes, exist_ok=True)
 
     intrinsics = FOV_to_intrinsics(fov_deg, device=device)
     cam_pivot = torch.tensor(G.rendering_kwargs.get('avg_camera_pivot', [0, 0, 0]), device=device)
@@ -124,9 +132,11 @@ def generate_images(
         print('Generating image for seed %d (%d/%d) ...' % (seed, seed_idx, len(seeds)))
         z = torch.from_numpy(np.random.RandomState(seed).randn(1, G.z_dim)).to(device)
         ws = G.mapping(z, conditioning_params, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
+        if mapped_latents:
+            np.save(f'{outdir_ws}/seed{seed:04d}.npy', ws.cpu().numpy())
         if save_planes:
             planes = G.backbone.synthesis(ws)
-            np.save(f'{outdir}/seed{seed:04d}.npy', planes.cpu().numpy())
+            np.save(f'{outdir_planes}/seed{seed:04d}.npy', planes.cpu().numpy())
             if not reload_modules:
                 planes = None
         else:
