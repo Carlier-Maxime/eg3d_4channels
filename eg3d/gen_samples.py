@@ -72,6 +72,7 @@ def make_transform(translate: Tuple[float, float], angle: float):
 @click.option('--shape-format', help='Shape Format', type=click.Choice(['.mrc', '.ply']), default='.mrc')
 @click.option('--planes', 'save_planes', help='Save Planes into npy file', type=bool, required=False, metavar='BOOL', default=False, show_default=True, is_flag=True)
 @click.option('--reload_modules', help='Overload persistent modules?', type=bool, required=False, metavar='BOOL', default=False, show_default=True)
+@click.option('--random-camera', help='Use a random camera', type=bool, required=False, metavar='BOOL', default=False, show_default=True, is_flag=True)
 def generate_images(
         network_pkl: str,
         seeds: List[int],
@@ -83,7 +84,8 @@ def generate_images(
         fov_deg: float,
         shape_format: str,
         save_planes: bool,
-        reload_modules: bool
+        reload_modules: bool,
+        random_camera: bool
 ):
     """Generate images using pretrained network pickle.
 
@@ -130,7 +132,11 @@ def generate_images(
 
         imgs = []
         angle_p = -0.2
-        for angle_y, angle_p in [(.4, angle_p), (0, angle_p), (-.4, angle_p)]:
+        if random_camera:
+            angles = (torch.rand((3, 2), device=device) * 2 - 1) * torch.pi / 6
+        else:
+            angles = [(.4, angle_p), (0, angle_p), (-.4, angle_p)]
+        for angle_y, angle_p in angles:
             cam2world_pose = LookAtPoseSampler.sample(np.pi / 2 + angle_y, np.pi / 2 + angle_p, cam_pivot, radius=cam_radius, device=device)
             camera_params = torch.cat([cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
             img = G.synthesis(ws, camera_params)['image'] if planes is None else G.synthesis(ws, camera_params, planes=planes)['image']
