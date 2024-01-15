@@ -23,6 +23,7 @@ from tqdm import tqdm
 from camera_utils import LookAtPoseSampler, FOV_to_intrinsics
 from gen_utils import parse_range, loadNetwork, create_samples
 from torch_utils import misc
+from training.generator import Generator
 from training.triplane import TriPlaneGenerator
 
 
@@ -69,6 +70,7 @@ def make_transform(translate: Tuple[float, float], angle: float):
 @click.option('--shape-res', help='', type=int, required=False, metavar='int', default=512, show_default=True)
 @click.option('--fov-deg', help='Field of View of camera in degrees', type=int, required=False, metavar='float', default=18.837, show_default=True)
 @click.option('--shape-format', help='Shape Format', type=click.Choice(['.mrc', '.ply']), default='.mrc')
+@click.option('--planes', 'save_planes', help='Save Planes into npy file', type=bool, required=False, metavar='BOOL', default=False, show_default=True, is_flag=True)
 @click.option('--reload_modules', help='Overload persistent modules?', type=bool, required=False, metavar='BOOL', default=False, show_default=True)
 def generate_images(
         network_pkl: str,
@@ -80,7 +82,8 @@ def generate_images(
         shape_res: int,
         fov_deg: float,
         shape_format: str,
-        reload_modules: bool,
+        save_planes: bool,
+        reload_modules: bool
 ):
     """Generate images using pretrained network pickle.
 
@@ -98,11 +101,11 @@ def generate_images(
     # Specify reload_modules=True if you want code modifications to take effect; otherwise uses pickled code
     if reload_modules:
         print("Reloading Modules!")
-        G_new = TriPlaneGenerator(*G.init_args, **G.init_kwargs).eval().requires_grad_(False).to(device)
-        misc.copy_params_and_buffers(G, G_new, require_all=True)
-        G_new.neural_rendering_resolution = G.neural_rendering_resolution
-        G_new.rendering_kwargs = G.rendering_kwargs
-        G = G_new
+        G_data = G
+        G = Generator(**G_data.init_kwargs).requires_grad_(False).to(device)
+        misc.copy_params_and_buffers(G_data, G if list(G_data.named_parameters())[0][0].startswith("triplane.") else G.triplane, require_all=True)
+        G.neural_rendering_resolution = G_data.neural_rendering_resolution
+        G.rendering_kwargs = G_data.rendering_kwargs
 
     os.makedirs(outdir, exist_ok=True)
 
@@ -117,13 +120,20 @@ def generate_images(
         print('Generating image for seed %d (%d/%d) ...' % (seed, seed_idx, len(seeds)))
         z = torch.from_numpy(np.random.RandomState(seed).randn(1, G.z_dim)).to(device)
         ws = G.mapping(z, conditioning_params, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
+        if save_planes:
+            planes = G.backbone.synthesis(ws)
+            np.save(f'{outdir}/seed{seed:04d}.npy', planes.cpu().numpy())
+            if not reload_modules:
+                planes = None
+        else:
+            planes = None
 
         imgs = []
         angle_p = -0.2
         for angle_y, angle_p in [(.4, angle_p), (0, angle_p), (-.4, angle_p)]:
             cam2world_pose = LookAtPoseSampler.sample(np.pi / 2 + angle_y, np.pi / 2 + angle_p, cam_pivot, radius=cam_radius, device=device)
             camera_params = torch.cat([cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
-            img = G.synthesis(ws, camera_params)['image']
+            img = G.synthesis(ws, camera_params)['image'] if planes is None else G.synthesis(ws, camera_params, planes=planes)['image']
             img = (img.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
             imgs.append(img)
 
