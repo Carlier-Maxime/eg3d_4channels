@@ -344,7 +344,17 @@ def combineFeaturesAndLmks(features_dir, lmks_dir, outdir, max_elements: int = -
         np.savez(f'{outdir}/{os.path.splitext(key)[0]}.npz', features_map=features_map, lmks=lmks)
 
 
+def combineImgAndLmks(features_dir, lmks_dir, outdir, max_elements: int = -1):
+    keys = sorted({os.path.relpath(os.path.join(root, fname), start=lmks_dir) for root, _dirs, files in os.walk(lmks_dir) for fname in files if os.path.splitext(fname)[1].lower() == '.npy'})
+    for i, key in enumerate(keys):
+        if i >= max_elements > -1:
+            break
+        lmks = np.load(f'{lmks_dir}/{key}')
+        features_map = np.array(PIL.Image.open(f"{features_dir}/{key.split('.npy')[0]}.png"))
+        np.savez(f'{outdir}/{os.path.splitext(key)[0]}.npz', features_map=features_map, lmks=lmks)
+
 # ----------------------------------------------------------------------------
+
 
 @click.command()
 @click.pass_context
