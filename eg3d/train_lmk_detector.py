@@ -40,6 +40,7 @@ def createLmkDetector(opts):
 @click.option('--nb-pts', help='Number of points', metavar='INT', type=click.IntRange(min=1), default=105, show_default=True)
 @click.option('--features-res', help='Features Resolution', metavar='INT', type=click.IntRange(min=1), default=256, show_default=True)
 @click.option('--channels', help='Features Channels', metavar='INT', type=click.IntRange(min=1), default=96, show_default=True)
+@click.option('--eg3d-network', help='Network EG3D for generate features from a mapped latents provided by a dataset', metavar='PKL', type=str, default=None, show_default=True)
 def main(**kwargs):
     opts = EasyDict(kwargs)
     dataset = NumpyFolderDataset(opts.data)
@@ -80,11 +81,17 @@ def main(**kwargs):
     nb_epochs = 0
     lr = opts.lr
     scheduler = None
+    eg3d_network = None
+    if opts.eg3d_network is not None:
+        with open(opts.eg3d_network, 'rb') as f:
+            eg3d_network = pickle.Unpickler(f).load()['G'].to(opts.device).requires_grad_(True)
     if opts.reduce_lr == 'exp':
         scheduler = lr_scheduler.ExponentialLR(optimizer, gamma=0.999)
     while nb_epochs < opts.epochs:
         for features_map, real_lmks in dataloader:
             real_lmks = real_lmks.to(opts.device).to(torch.float32)
+            if eg3d_network is not None:
+                features_map = eg3d_network.backbone.synthesis(features_map.to(opts.device))
             features_map = features_map.to(opts.device).to(torch.float32)
             lmks = lmkDetector(features_map)
             loss = criterion(lmks, real_lmks)
