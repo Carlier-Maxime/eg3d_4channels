@@ -27,7 +27,7 @@ def createLmkDetector(opts):
 # Required.
 @click.option('--data', help='Training data', metavar='[ZIP|DIR]', type=str, required=True)
 @click.option('--batch', help='Total batch size', metavar='INT', type=click.IntRange(min=1), required=True)
-@click.option('--epochs', help='Number of epochs', metavar='INT', type=click.IntRange(min=1), required=True)
+@click.option('--kimg', help='Number of kimg', metavar='INT', type=click.IntRange(min=1), required=True)
 @click.option('--lr', help='learning rate', metavar='FLOAT', type=click.FloatRange(min=1e-8), required=True)
 # Optional
 @click.option('--output', help='Where to save the results', metavar='DIR', default='output', show_default=True)
@@ -77,8 +77,8 @@ def main(**kwargs):
     print(f"Total Trainable Parameters: {total_params}")
     criterion = torch.nn.MSELoss()
     optimizer = optim.Adam(lmkDetector.parameters(), lr=opts.lr)
-    pbar = tqdm(total=opts.epochs, desc='Training', unit='epochs')
-    nb_epochs = 0
+    pbar = tqdm(total=opts.kimg * 1000, desc='Training', unit='imgs')
+    nb_imgs = 0
     lr = opts.lr
     scheduler = None
     eg3d_network = None
@@ -87,7 +87,7 @@ def main(**kwargs):
             eg3d_network = pickle.Unpickler(f).load()['G'].to(opts.device).requires_grad_(True)
     if opts.reduce_lr == 'exp':
         scheduler = lr_scheduler.ExponentialLR(optimizer, gamma=0.999)
-    while nb_epochs < opts.epochs:
+    while nb_imgs < opts.kimg * 1000:
         for features_map, real_lmks in dataloader:
             real_lmks = real_lmks.to(opts.device).to(torch.float32)
             if eg3d_network is not None:
@@ -97,25 +97,25 @@ def main(**kwargs):
             loss = criterion(lmks, real_lmks)
             pbar.set_postfix(lr=f"{optimizer.param_groups[0]['lr']:.3e}", loss=f'{float(loss):.3e}')
             if tf_events is not None:
-                tf_events.add_scalar('Loss/Train', loss.item(), nb_epochs)
+                tf_events.add_scalar('Loss/Train', loss.item(), nb_imgs)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            if opts.reduce_lr == 'std' and nb_epochs % 100 == 0 and nb_epochs > 0:
+            if opts.reduce_lr == 'std' and nb_imgs % 1000 == 0 and nb_imgs > 0:
                 for group in optimizer.param_groups:
                     lr /= 10
                     group['lr'] = lr
             elif scheduler is not None:
                 scheduler.step()
-            nb_epochs += 1
-            pbar.update(1)
-            if nb_epochs == opts.epochs:
+            nb_imgs += real_lmks.shape[0]
+            pbar.update(real_lmks.shape[0])
+            if nb_imgs >= opts.kimg * 1000:
                 break
     pbar.close()
     if tf_events is not None:
         tf_events.close()
     os.makedirs(opts.output, exist_ok=True)
-    fname = f'{opts.output}/lmkDetector-{nb_epochs}'
+    fname = f'{opts.output}/lmkDetector-{nb_imgs//1000:06d}'
     if opts.resume is not None:
         resume = opts.resume.split("lmkDetector-")[1].split(".pth")[0].split("-")[0]
         fname += f'-resume-{resume}'
