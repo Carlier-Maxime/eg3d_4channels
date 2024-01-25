@@ -87,32 +87,36 @@ def main(**kwargs):
             eg3d_network = pickle.Unpickler(f).load()['G'].to(opts.device).requires_grad_(True)
     if opts.reduce_lr == 'exp':
         scheduler = lr_scheduler.ExponentialLR(optimizer, gamma=0.999)
+
+    def gen_loss(features_map, real_lmks):
+        real_lmks = real_lmks.to(opts.device).to(torch.float32)
+        if eg3d_network is not None:
+            features_map = eg3d_network.backbone.synthesis(features_map.to(opts.device))
+        features_map = features_map.to(opts.device).to(torch.float32)
+        lmks = lmkDetector(features_map)
+        return criterion(lmks, real_lmks)
+
     while nb_imgs < opts.kimg * 1000:
         for features_map, real_lmks in dataloader:
-            real_lmks = real_lmks.to(opts.device).to(torch.float32)
-            if eg3d_network is not None:
-                features_map = eg3d_network.backbone.synthesis(features_map.to(opts.device))
-            features_map = features_map.to(opts.device).to(torch.float32)
-            lmks = lmkDetector(features_map)
-            loss = criterion(lmks, real_lmks)
+            loss = gen_loss(features_map, real_lmks)
             pbar.set_postfix(lr=f"{optimizer.param_groups[0]['lr']:.3e}", loss=f'{float(loss):.3e}')
             if tf_events is not None:
                 tf_events.add_scalar('Loss/Train', loss.item(), nb_imgs)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            if opts.reduce_lr == 'std' and nb_imgs % 1000 == 0 and nb_imgs > 0:
+            nb_imgs += real_lmks.shape[0]
+            pbar.update(real_lmks.shape[0])
+            if opts.reduce_lr == 'std' and nb_imgs % 1000 == 0:
                 for group in optimizer.param_groups:
                     lr /= 10
                     group['lr'] = lr
             elif scheduler is not None:
                 scheduler.step()
-            nb_imgs += real_lmks.shape[0]
-            pbar.update(real_lmks.shape[0])
             if nb_imgs >= opts.kimg * 1000:
                 break
-    pbar.close()
     if tf_events is not None:
+        tf_events.add_scalar('Loss/Train', gen_loss(*next(iter(dataloader))).item(), nb_imgs)
         tf_events.close()
     os.makedirs(opts.output, exist_ok=True)
     fname = f'{opts.output}/lmkDetector-{nb_imgs//1000:06d}'
