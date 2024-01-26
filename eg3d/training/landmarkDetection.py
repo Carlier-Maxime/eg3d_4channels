@@ -71,7 +71,7 @@ class LandmarkDetectorExperience(nn.Module):
         super().__init__()
         embed_pooling = []
         res = img_resolution
-        assert (res & (res-1)) == 0 and res != 0, "img resolution is not a 2^x. Not supported"
+        assert (res & (res - 1)) == 0 and res != 0, "img resolution is not a 2^x. Not supported"
         while res > 256:
             embed_pooling += [nn.MaxPool2d(kernel_size=2, stride=2), nn.Conv2d(img_channels, img_channels, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True)]
             res >>= 1
@@ -90,10 +90,10 @@ class LandmarkDetectorExperience(nn.Module):
         def channelsUp(input_channels: int, pool2D: bool = False) -> list[nn.Module]:
             sequence = [
                 nn.Conv2d(input_channels, input_channels, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True),
-                nn.Conv2d(input_channels, input_channels*2, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True)
+                nn.Conv2d(input_channels, input_channels * 2, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True)
             ]
             if pool2D:
-                sequence += [nn.Conv2d(input_channels*2, input_channels*2, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True), nn.MaxPool2d(kernel_size=2, stride=2)]
+                sequence += [nn.Conv2d(input_channels * 2, input_channels * 2, kernel_size=3, dilation=1, padding=1), nn.ReLU(inplace=True), nn.MaxPool2d(kernel_size=2, stride=2)]
             return sequence
 
         to8res = []
@@ -109,7 +109,7 @@ class LandmarkDetectorExperience(nn.Module):
             nn.Conv2d(1024, 1024, kernel_size=3, dilation=1, padding=1))
         res = min(res, 4)
 
-        pow2_pts = 1 << (int(np.log2(nb_pts*3)) + 2)
+        pow2_pts = 1 << (int(np.log2(nb_pts * 3)) + 2)
         toPow2_pts = []
         channels = 1024
         while channels < pow2_pts:
