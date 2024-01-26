@@ -41,6 +41,7 @@ def createLmkDetector(opts):
 @click.option('--features-res', help='Features Resolution', metavar='INT', type=click.IntRange(min=1), default=256, show_default=True)
 @click.option('--channels', help='Features Channels', metavar='INT', type=click.IntRange(min=1), default=96, show_default=True)
 @click.option('--eg3d-network', help='Network EG3D for generate features from a mapped latents provided by a dataset', metavar='PKL', type=str, default=None, show_default=True)
+@click.option('--snap', help='Snapshot interval', metavar='KIMG', type=click.IntRange(min=1), default=32, show_default=True)
 def main(**kwargs):
     opts = EasyDict(kwargs)
     dataset = NumpyFolderDataset(opts.data)
@@ -96,8 +97,24 @@ def main(**kwargs):
         lmks = lmkDetector(features_map)
         return criterion(lmks, real_lmks)
 
+    os.makedirs(opts.output, exist_ok=True)
+
+    def save_snap():
+        fname = f'{opts.output}/lmkDetector-{nb_imgs // 1000:06d}'
+        if opts.resume is not None:
+            resume = opts.resume.split("lmkDetector-")[1].split(".pth")[0].split("-")[0]
+            fname += f'-resume-{resume}'
+        if opts.to_pth:
+            torch.save(lmkDetector.state_dict(), f'{fname}.pth')
+        else:
+            with open(f"{fname}.pkl", 'wb') as f:
+                pickle.dump(copy.deepcopy(lmkDetector).eval().requires_grad_(False).cpu(), f)
+
+    snap_index = 0
     while nb_imgs < opts.kimg * 1000:
         for features_map, real_lmks in dataloader:
+            if nb_imgs >= (snap_index * opts.snap * 1000):
+                save_snap()
             loss = gen_loss(features_map, real_lmks)
             pbar.set_postfix(lr=f"{optimizer.param_groups[0]['lr']:.3e}", loss=f'{float(loss):.3e}')
             if tf_events is not None:
@@ -118,16 +135,7 @@ def main(**kwargs):
     if tf_events is not None:
         tf_events.add_scalar('Loss/Train', gen_loss(*next(iter(dataloader))).item(), nb_imgs)
         tf_events.close()
-    os.makedirs(opts.output, exist_ok=True)
-    fname = f'{opts.output}/lmkDetector-{nb_imgs//1000:06d}'
-    if opts.resume is not None:
-        resume = opts.resume.split("lmkDetector-")[1].split(".pth")[0].split("-")[0]
-        fname += f'-resume-{resume}'
-    if opts.to_pth:
-        torch.save(lmkDetector.state_dict(), f'{fname}.pth')
-    else:
-        with open(f"{fname}.pkl", 'wb') as f:
-            pickle.dump(copy.deepcopy(lmkDetector).eval().requires_grad_(False).cpu(), f)
+    save_snap()
 
 
 if __name__ == '__main__':
