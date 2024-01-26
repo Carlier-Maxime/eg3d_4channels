@@ -31,6 +31,7 @@ def createLmkDetector(opts):
 @click.option('--lr', help='learning rate', metavar='FLOAT', type=click.FloatRange(min=1e-8), required=True)
 # Optional
 @click.option('--output', help='Where to save the results', metavar='DIR', default='output', show_default=True)
+@click.option('--run-dir', help='Name of directory for save this training', metavar='DIR', default=None, show_default=True)
 @click.option('--device', help='device used for training', metavar='[cuda|cpu]', type=str, default='cuda', show_default=True)
 @click.option('--resume', help='resume from pth or pkl file', metavar='[pth|pkl]', type=str, default=None, show_default=True)
 @click.option('--reduce-lr', help='reduce learning rate during training', type=click.Choice(['std', 'exp']), default=None, show_default=True)
@@ -60,6 +61,11 @@ def main(**kwargs):
         print("Create Network...", end='')
         lmkDetector = createLmkDetector(opts)
         print(" Done")
+
+    if opts.run_dir is None:
+        opts.run_dir = f'{opts.kimg}k_{opts.detector_type}_{opts.features_res}²:{opts.channels}>{opts.nb_pts}_lr{opts.lr:.1e}:{opts.reduce_lr}_batch{opts.batch}'
+    opts.output += f'/{opts.run_dir}'
+
     tf_events = None
     try:
         import torch.utils.tensorboard as tensorboard
