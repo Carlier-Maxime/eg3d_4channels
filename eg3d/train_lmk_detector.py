@@ -121,6 +121,7 @@ def main(**kwargs):
         for features_map, real_lmks in dataloader:
             if nb_imgs >= (snap_index * opts.snap * 1000):
                 save_snap()
+                snap_index += 1
             loss = gen_loss(features_map, real_lmks)
             pbar.set_postfix(lr=f"{optimizer.param_groups[0]['lr']:.3e}", loss=f'{float(loss):.3e}')
             if tf_events is not None:
