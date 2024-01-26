@@ -45,6 +45,7 @@ def createLmkDetector(opts):
 @click.option('--snap', help='Snapshot interval', metavar='KIMG', type=click.IntRange(min=1), default=32, show_default=True)
 def main(**kwargs):
     opts = EasyDict(kwargs)
+    if opts.detector_type == 'std': assert opts.batch % 4 == 0, 'batch must be a multiple of 4'
     dataset = NumpyFolderDataset(opts.data)
     dataloader = DataLoader(dataset, batch_size=opts.batch, shuffle=True, pin_memory=True)
     if opts.resume is not None:
@@ -97,9 +98,14 @@ def main(**kwargs):
 
     def gen_loss(features_map, real_lmks):
         real_lmks = real_lmks.to(opts.device).to(torch.float32)
+        features_map = features_map.to(opts.device)
         if eg3d_network is not None:
-            features_map = eg3d_network.backbone.synthesis(features_map.to(opts.device))
-        features_map = features_map.to(opts.device).to(torch.float32)
+            features_map = eg3d_network.backbone.synthesis(features_map)
+        features_map = features_map.to(torch.float32)
+        batch_size = real_lmks.shape[0]
+        if batch_size % 4 != 0 and opts.detector_type == 'std':
+            real_lmks = real_lmks.repeat(2, 1, 1)[:batch_size + batch_size % 4]
+            features_map = features_map.repeat(2, 1, 1, 1)[:batch_size + batch_size % 4]
         lmks = lmkDetector(features_map)
         return criterion(lmks, real_lmks)
 
