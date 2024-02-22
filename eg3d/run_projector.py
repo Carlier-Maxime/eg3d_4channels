@@ -66,11 +66,11 @@ def create_sub_folder(i: int, dir_latents: str, dir_features: str, dir_snapshots
     return out_latents, out_features, out_snapshots
 
 
-def subprocess_fn(rank, G, image_log_step, repeat_w, num_steps, datasets, batch, out_latents, out_features, out_snapshots, save_features_map, starts_index):
+def subprocess_fn(rank, G, image_log_step, repeat_w, num_steps, datasets, batch, out_latents, out_features, out_snapshots, save_features_map, starts_index, devices):
     dir_features = out_features
     dir_latents = out_latents
     dir_snapshots = out_snapshots
-    device = torch.device('cuda', rank)
+    device = torch.device('cuda', rank if devices is None else devices[rank])
     dataloader = DataLoader(datasets[rank], batch_size=batch, shuffle=False, pin_memory=True)
     projector = EG3DInverter(device=device, w_avg_samples=600, image_log_step=image_log_step, repeat_w=repeat_w)
     G = G.to(device)
@@ -102,6 +102,7 @@ def subprocess_fn(rank, G, image_log_step, repeat_w, num_steps, datasets, batch,
 @click.option('--limit', type=int, help='limit images, used only with dataset', default=-1, show_default=True)
 @click.option('--save-features-map', type=bool, help='save features map', default=False, is_flag=True, show_default=True)
 @click.option('--gpus', type=int, help='number of GPU used, used only with dataset', default=1, show_default=True)
+@click.option('--devices', 'devices_str', type=str, help='list of specific gpu used ex: [0,1,2,3,4,5,6,7]', default=None, show_default=True)
 def run(
         network_pkl: str,
         outdir: str,
@@ -116,7 +117,8 @@ def run(
         batch: int,
         limit: int,
         save_features_map: bool,
-        gpus: int
+        gpus: int,
+        devices_str: str
 ):
     """Render a latent vector interpolation video.
     Examples:
@@ -134,7 +136,8 @@ def run(
     output video length will be '# seeds/(w*h)*w_frames' frames.
     """
     print('Loading networks from "%s"...' % network_pkl)
-    device = torch.device('cuda')
+    devices = None if devices_str is None else [int(i) for i in devices_str[1:-1].split(',')]
+    device = torch.device(f'cuda:{devices[0]}')
     with dnnlib.util.open_url(network_pkl) as f:
         G = legacy.load_network_pkl(f)['G_ema'].to(device)  # type: ignore
 
@@ -176,7 +179,7 @@ def run(
         starts = [sum(sizes[:i]) for i in range(len(sizes))]
         datasets = [Subset(dataset, range(start, start + size)) for start, size in zip(starts, sizes)]
         torch.multiprocessing.set_start_method('spawn')
-        torch.multiprocessing.spawn(fn=subprocess_fn, args=(G, image_log_step, latent_space_type == 'w', num_steps, datasets, batch, out_latents, out_features, out_snapshots, save_features_map, starts), nprocs=gpus)
+        torch.multiprocessing.spawn(fn=subprocess_fn, args=(G, image_log_step, latent_space_type == 'w', num_steps, datasets, batch, out_latents, out_features, out_snapshots, save_features_map, starts, devices), nprocs=gpus)
 
 
 # ----------------------------------------------------------------------------
