@@ -27,6 +27,7 @@ from training.dataset import ImageAndNumpyFolderDataset
 @click.option('--lr', type=float, default=3e-4, help='learning rate')
 def run_PTI(**kwargs):
     opts = dnnlib.EasyDict(kwargs)
+    print("Run Name : "+opts.run_name)
     dataset = ImageAndNumpyFolderDataset(opts.dataset, force_rgb=opts.force_rgb, use_labels=True, require_pts=opts.network_lmks is not None)
     dataloader = DataLoader(dataset, batch_size=opts.batch, shuffle=False)
     coach_args = {
