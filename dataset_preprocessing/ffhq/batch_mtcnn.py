@@ -29,7 +29,7 @@ out_detection = os.path.join(in_root, "detections")
 if not os.path.exists(out_detection):
     os.makedirs(out_detection)
 
-imgs = sorted([x for x in os.listdir(in_root) if x.endswith(".jpg") or x.endswith(".png")])
+imgs = sorted([os.path.join(root, name) for root, dirs, files in os.walk(in_root) for name in files if name.endswith(".jpg") or name.endswith(".png")])
 random.shuffle(imgs)
 for img in imgs:
     src = os.path.join(in_root, img)
