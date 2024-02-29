@@ -30,6 +30,7 @@ class SimpleCoach(BaseCoach):
         if total_steps > limit > 0: total_steps = limit
         snap *= 1000
         limit *= 1000
+        next_snap = snap
         for _ in tqdm(range(nb_epochs), unit="epoch"):
             for img_name, imgs, ws_pivots, camera, pts in tqdm(self.data_loader, unit="batch", leave=False):
                 if restart_training_between_img_batch: self.restart_training()
@@ -41,5 +42,7 @@ class SimpleCoach(BaseCoach):
                     gen_imgs, gen_lmks = self.train_step(imgs, ws_pivots, camera, pts, lpips_threshold)
                     if gen_imgs is None: break
                 self.image_counter += len(imgs)
-                if self.image_counter % snap == 0: self.save_snapshot(run_name, self._step, total_steps)
+                if self._step >= next_snap:
+                    self.save_snapshot(run_name, self._step, total_steps)
+                    next_snap += snap
         self.save_snapshot(run_name, self._step, total_steps, final=True)

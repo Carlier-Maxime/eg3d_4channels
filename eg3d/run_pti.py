@@ -17,7 +17,7 @@ from training.dataset import ImageAndNumpyFolderDataset
 @click.option('--force-rgb', type=bool, default=False, is_flag=True, help='force RGB images')
 @click.option('--run_name', type=str, default=''.join(choice(ascii_uppercase) for i in range(12)), help='run name, is used for saving results')
 @click.option('--reset-between-batch', type=bool, default=False, is_flag=True, help='use reset between batch for a specific network per batch')
-@click.option('--snap', type=int, default=4, help='the number of kimg between saving a snapshot')
+@click.option('--snap', type=int, default=4, help='the number of thousand step between saving a snapshot')
 @click.option('--batch', type=int, default=1, help='batch size')
 @click.option('--device', type=str, default='cuda', help='the device used for Pivotal Tuning')
 @click.option('--epochs', type=int, default=1, help='number of epochs')
