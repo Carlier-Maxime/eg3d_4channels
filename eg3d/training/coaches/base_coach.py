@@ -94,7 +94,7 @@ class BaseCoach:
         return gen_imgs, gen_lmks
 
     @abc.abstractmethod
-    def train(self, run_name: str, nb_steps: int, limit: int = -1, lpips_threshold: float = 0, **kwargs):
+    def train(self, **kwargs):
         pass
 
     def configure_optimizers(self):
@@ -117,7 +117,7 @@ class BaseCoach:
             ball_holder_loss_val = self.space_regulizer.space_regulizer_loss(new_G, w_batch)
             loss += ball_holder_loss_val
         if gen_lmks is not None:
-            loss_lmks_val = self.l2_loss(gen_lmks, lmks)
+            loss_lmks_val = self.l2_loss(gen_lmks.flatten(), lmks.flatten())
             loss += loss_lmks_val * self.loss_lmks_lambda
         return loss, l2_loss_val, loss_lpips, loss_lmks_val
 
