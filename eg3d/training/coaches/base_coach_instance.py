@@ -63,7 +63,7 @@ class BaseCoachInstance(object):
         if self._is_master:
             if self.tf_events is not None:
                 for key, val in loss_no_grad.items():
-                    self.tf_events.add_scalar(key, val.item(), self._local_step)
+                    self.tf_events.add_scalar('Loss/'+key, val.item(), self._local_step)
         self._use_ball_holder = self._local_step % self.model.locality_regularization_interval == 0
         self._local_step += 1
         return gen_imgs, gen_lmks
