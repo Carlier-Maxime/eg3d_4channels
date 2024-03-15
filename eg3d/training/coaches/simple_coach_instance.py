@@ -23,7 +23,6 @@ class SimpleCoachInstance(BaseCoachInstance):
             gen_imgs, gen_lmks = self.forward(ws_pivots, camera)
             for name, gen_img in zip(img_name, gen_imgs):
                 self.model.save_preview(f'{run_name}/{current_step}_PTI', name, gen_img)
-        print(f"gpu{self.rank} terminate a save snapshot")
 
     def train(self, run_name: str, nb_epochs: int, steps_per_batch: int, limit: int = -1, lpips_threshold: float = 0, restart_training_between_img_batch: bool = False, snap: int = 4, **kwargs):
         os.makedirs(f'{self.outdir}/{run_name}', exist_ok=True)
@@ -31,8 +30,8 @@ class SimpleCoachInstance(BaseCoachInstance):
         self._local_step = 0
         total_steps = nb_epochs*len(self.data_loader)*steps_per_batch
         if total_steps > limit > 0: total_steps = limit
-        snap *= 1000
-        limit *= 1000
+        snap = (snap*1000) / self.model.num_gpus
+        limit = (limit*1000) / self.model.num_gpus
         next_snap = snap
         for _ in tqdm(range(nb_epochs), unit="epoch", disable=not self._is_master):
             for img_name, imgs, ws_pivots, camera, pts in tqdm(self.data_loader, unit="batch", leave=False, disable=not self._is_master):
