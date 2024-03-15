@@ -158,7 +158,7 @@ class SimpleSampler(torch.utils.data.Sampler):
             self.idx += 1
 
     def __len__(self):
-        return len(self.dataset)
+        return len(self.dataset) // self.num_replicas
 
 
 # Sampler for torch.utils.data.DataLoader that loops over the dataset
