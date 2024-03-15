@@ -10,6 +10,8 @@
 
 import re
 import contextlib
+from io import UnsupportedOperation
+
 import numpy as np
 import torch
 import torch.utils.data
@@ -118,10 +120,8 @@ def profiled_function(fn):
 
 
 # ----------------------------------------------------------------------------
-# Sampler for torch.utils.data.DataLoader that loops over the dataset
-# indefinitely, shuffling items as it goes.
 
-class InfiniteSampler(torch.utils.data.Sampler):
+class SimpleSampler(torch.utils.data.Sampler):
     def __init__(self, dataset, rank=0, num_replicas=1, shuffle=True, seed=0, window_size=0.5):
         assert len(dataset) > 0
         assert num_replicas > 0
@@ -135,6 +135,9 @@ class InfiniteSampler(torch.utils.data.Sampler):
         self.seed = seed
         self.window_size = window_size
 
+    def has_next(self):
+        return self.idx < len(self.dataset)
+
     def __iter__(self):
         order = np.arange(len(self.dataset))
         rnd = None
@@ -144,15 +147,31 @@ class InfiniteSampler(torch.utils.data.Sampler):
             rnd.shuffle(order)
             window = int(np.rint(order.size * self.window_size))
 
-        idx = 0
-        while True:
-            i = idx % order.size
-            if idx % self.num_replicas == self.rank:
+        self.idx = 0
+        while self.has_next():
+            i = self.idx % order.size
+            if self.idx % self.num_replicas == self.rank:
                 yield order[i]
             if window >= 2:
                 j = (i - rnd.randint(window)) % order.size
                 order[i], order[j] = order[j], order[i]
-            idx += 1
+            self.idx += 1
+
+    def __len__(self):
+        return len(self.dataset)
+
+
+# Sampler for torch.utils.data.DataLoader that loops over the dataset
+# indefinitely, shuffling items as it goes.
+class InfiniteSampler(SimpleSampler):
+    def __init__(self, dataset, rank=0, num_replicas=1, shuffle=True, seed=0, window_size=0.5):
+        super().__init__(dataset, rank, num_replicas, shuffle, seed, window_size)
+
+    def has_next(self):
+        return True
+
+    def __len__(self):
+        raise UnsupportedOperation('Not implemented yet')
 
 
 # ----------------------------------------------------------------------------
