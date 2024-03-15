@@ -135,8 +135,8 @@ class SimpleSampler(torch.utils.data.Sampler):
         self.seed = seed
         self.window_size = window_size
 
-    def has_next(self):
-        return self.idx < len(self.dataset)
+    def has_next(self, idx):
+        return idx < len(self.dataset)
 
     def __iter__(self):
         order = np.arange(len(self.dataset))
@@ -147,15 +147,15 @@ class SimpleSampler(torch.utils.data.Sampler):
             rnd.shuffle(order)
             window = int(np.rint(order.size * self.window_size))
 
-        self.idx = 0
-        while self.has_next():
-            i = self.idx % order.size
-            if self.idx % self.num_replicas == self.rank:
+        idx = 0
+        while self.has_next(idx):
+            i = idx % order.size
+            if idx % self.num_replicas == self.rank:
                 yield order[i]
             if window >= 2:
                 j = (i - rnd.randint(window)) % order.size
                 order[i], order[j] = order[j], order[i]
-            self.idx += 1
+            idx += 1
 
     def __len__(self):
         return len(self.dataset) // self.num_replicas
