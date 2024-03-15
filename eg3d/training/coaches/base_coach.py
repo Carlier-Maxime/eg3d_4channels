@@ -100,7 +100,7 @@ class BaseCoach:
             ball_holder_loss_val = spaceRegulizer.space_regulizer_loss(new_G, w_batch)
             loss += ball_holder_loss_val
         if gen_lmks is not None:
-            loss_lmks_val = self.l2_loss(gen_lmks.flatten(), lmks.flatten())
+            loss_lmks_val = self.l2_loss(gen_lmks.flatten(), lmks.flatten()) / self.__original_G.img_resolution
             loss += loss_lmks_val * self.loss_lmks_lambda
         return {"loss": loss, "lpips": loss_lpips, "l2": l2_loss_val, "lmks": loss_lmks_val}
 
