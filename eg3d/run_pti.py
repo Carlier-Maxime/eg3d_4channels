@@ -2,10 +2,10 @@ from random import choice
 from string import ascii_uppercase
 
 import click
-from torch.utils.data import DataLoader
 
 import dnnlib
-from training.coaches.simple_coach import SimpleCoach
+from training.coaches.base_coach import BaseCoach
+from training.coaches.simple_coach_instance import SimpleCoachInstance
 from training.dataset import ImageAndNumpyFolderDataset
 
 
@@ -20,26 +20,27 @@ from training.dataset import ImageAndNumpyFolderDataset
 @click.option('--snap', type=int, default=4, help='the number of thousand step between saving a snapshot')
 @click.option('--batch', type=int, default=1, help='batch size')
 @click.option('--device', type=str, default='cuda', help='the device used for Pivotal Tuning')
+@click.option('--gpus', type=click.IntRange(min=1), default=1, help='the number of gpus used for Pivotal Tuning')
 @click.option('--epochs', type=int, default=1, help='number of epochs')
 @click.option('--steps-batch', type=int, default=350, help='the number of PTI steps per batch')
 @click.option('--limit', type=int, default=-1, help='the maximum number of kimg used')
 @click.option('--lpips-threshold', type=float, default=0, help='lpips threshold for stop PTI')
 @click.option('--lr', type=float, default=3e-4, help='learning rate')
+@click.option('--use-idr', type=bool, default=False, is_flag=True, help='use idr_torch')
 def run_PTI(**kwargs):
     opts = dnnlib.EasyDict(kwargs)
     print("Run Name : "+opts.run_name)
     dataset = ImageAndNumpyFolderDataset(opts.dataset, force_rgb=opts.force_rgb, use_labels=True, require_pts=opts.network_lmks is not None)
-    dataloader = DataLoader(dataset, batch_size=opts.batch, shuffle=False)
     coach_args = {
         "network_pkl": opts.network,
-        "data_loader": dataloader,
+        "dataset": dataset,
         "device": opts.device,
         "lr": opts.lr,
         "outdir": opts.outdir,
         "network_lmks": opts.network_lmks
     }
-    coach = SimpleCoach(**coach_args)
-    coach.train(opts.run_name, opts.epochs, opts.steps_batch, limit=opts.limit, snap=opts.snap, restart_training_between_img_batch=opts.reset_between_batch)
+    coach = BaseCoach(**coach_args)
+    coach.train(SimpleCoachInstance, opts.gpus, opts.batch, use_idr_torch=opts.use_idr, run_name=opts.run_name, nb_epochs=opts.epochs, steps_per_batch=opts.steps_batch, limit=opts.limit, snap=opts.snap, restart_training_between_img_batch=opts.reset_between_batch)
     return opts.run_name
 
 
