@@ -30,15 +30,20 @@ class SimpleCoachInstance(BaseCoachInstance):
                 gen_imgs, gen_lmks = self.forward(ws_pivots, camera)
                 for img, lmk in zip(gen_imgs, gen_lmks):
                     if len(snap_imgs) >= count: break
-                    snap_imgs.append(img)
-                    snap_lmks.append(lmk)
+                    snap_imgs.append(img.cpu())
+                    snap_lmks.append(lmk.cpu())
             bar.update(len(ws_pivots))
             if len(snap_imgs) >= count: break
         bar.close()
         gw, gh = self.snap_grid_size
         C, H, W = snap_imgs[0].shape
-        img_grid = torch.stack(snap_imgs, dim=0).view(gh, gw, C, H, W)
-        img_grid = img_grid.permute(0, 3, 1, 4, 2).contiguous().view(gh * H, gw * W, C).permute(2, 0, 1)
+        img_grid = torch.stack(snap_imgs, dim=0).view(gh, gw, C, H, W).permute(0, 1, 3, 4, 2)
+        if snap_lmks[0].shape[1] == 2:
+            lmks = torch.stack(snap_lmks, dim=0).view(gh, gw, -1, 2).to(torch.int)
+            tmp = torch.where(((lmks >= 0) & (lmks < self.G.img_resolution)).all(dim=3))
+            lmks = lmks[tmp[0], tmp[1], tmp[2]]
+            img_grid[tmp[0], tmp[1], lmks[:, 0], lmks[:, 1]] = torch.tensor([1, -1, -1], dtype=img_grid.dtype)
+        img_grid = img_grid.permute(0, 2, 1, 3, 4).contiguous().view(gh * H, gw * W, C).permute(2, 0, 1)
         self.model.save_preview(outdir, "preview", img_grid)
 
     def calcul_metrics(self, limit: int = 1):
