@@ -41,7 +41,33 @@ class SimpleCoachInstance(BaseCoachInstance):
         img_grid = img_grid.permute(0, 3, 1, 4, 2).contiguous().view(gh * H, gw * W, C).permute(2, 0, 1)
         self.model.save_preview(outdir, "preview", img_grid)
 
-    def train(self, run_name: str, nb_epochs: int, steps_per_batch: int, limit: int = -1, lpips_threshold: float = 0, restart_training_between_img_batch: bool = False, snap: int = 4, **kwargs):
+    def calcul_metrics(self, limit: int = 1):
+        if limit == 0: return
+        count = limit*1000 // self.model.num_gpus
+        if self._is_master: count += limit % self.model.num_gpus
+        bar = tqdm(total=count, desc=f"Calcul part of metrics ({self._device})", unit="img", leave=False)
+        i = 0
+        loss = 0
+        div = 0
+        for img_name, imgs, ws_pivots, camera, pts in self.data_loader:
+            with torch.no_grad():
+                if i >= count: break
+                imgs = imgs.to(self._device)
+                ws_pivots = ws_pivots.to(self._device)
+                camera = camera.to(self._device)
+                pts = pts.to(self._device)
+                gen_imgs, gen_lmks = self.forward(ws_pivots, camera)
+                loss += self.model.calc_loss(self.lpips_loss, self.space_regulizer, gen_imgs, imgs, gen_lmks, pts, self.G, self._use_ball_holder, ws_pivots)["loss"]
+                i += len(imgs)
+                div += 1
+                bar.update(len(imgs))
+        bar.close()
+        loss /= div
+        torch.distributed.all_reduce(loss)
+        loss /= self.model.num_gpus
+        if self._is_master and self.tf_events is not None: self.tf_events.add_scalar("metrics", loss, self._local_step)
+
+    def train(self, run_name: str, nb_epochs: int, steps_per_batch: int, limit: int = -1, lpips_threshold: float = 0, restart_training_between_img_batch: bool = False, snap: int = 4, limit_metrics: int = 0, **kwargs):
         os.makedirs(f'{self.outdir}/{run_name}', exist_ok=True)
         self._use_ball_holder = True
         self._local_step = 0
@@ -55,6 +81,7 @@ class SimpleCoachInstance(BaseCoachInstance):
                 if restart_training_between_img_batch: self.restart_training()
                 if self.image_counter >= limit > 0:
                     self.save_snapshot(run_name, self._local_step, total_steps, final=True)
+                    self.calcul_metrics(limit_metrics)
                     return self.G, self.lmkDetector
 
                 for _ in tqdm(range(steps_per_batch), unit="step", leave=False, disable=not self._is_master):
@@ -63,6 +90,8 @@ class SimpleCoachInstance(BaseCoachInstance):
                 self.image_counter += len(imgs)
                 if self._local_step >= next_snap:
                     self.save_snapshot(run_name, self._local_step, total_steps)
+                    self.calcul_metrics(limit_metrics)
                     next_snap += snap
         self.save_snapshot(run_name, self._local_step, total_steps, final=True)
+        self.calcul_metrics(limit_metrics)
         return self.G, self.lmkDetector

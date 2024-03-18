@@ -60,6 +60,7 @@ class BaseCoachInstance(object):
         if self.model.num_gpus > 1:
             for loss in loss_no_grad.values():
                 torch.distributed.all_reduce(loss)
+                loss /= self.model.num_gpus
         if self._is_master:
             if self.tf_events is not None:
                 for key, val in loss_no_grad.items():

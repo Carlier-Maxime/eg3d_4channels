@@ -27,6 +27,7 @@ from training.dataset import ImageAndNumpyFolderDataset
 @click.option('--lpips-threshold', type=float, default=0, help='lpips threshold for stop PTI')
 @click.option('--lr', type=float, default=3e-4, help='learning rate')
 @click.option('--use-idr', type=bool, default=False, is_flag=True, help='use idr_torch')
+@click.option('--limit-metrics', type=click.IntRange(min=0), default=1, help='the number of thousand images usage for calcul metrics')
 def run_PTI(**kwargs):
     opts = dnnlib.EasyDict(kwargs)
     print("Run Name : "+opts.run_name)
