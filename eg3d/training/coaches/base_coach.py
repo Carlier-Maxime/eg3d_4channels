@@ -14,7 +14,8 @@ import PIL.Image
 
 
 class BaseCoach:
-    def __init__(self, network_pkl: str, dataset, device: torch.device, lr: float, l2_lambda: float = 1, lpips_lambda: float = 1, loss_lmks_lambda: float = 1, use_locality_regularization: bool = False, lpips_type: str = "alex", locality_regularization_interval: int = 1, outdir: str = "output", network_lmks: str | None = None):
+    def __init__(self, network_pkl: str, dataset, device: torch.device, lr: float, l2_lambda: float = 1, lpips_lambda: float = 1, loss_lmks_lambda: float = 1, use_locality_regularization: bool = False, lpips_type: str = "alex", locality_regularization_interval: int = 1, outdir: str = "output", network_lmks: str | None = None,
+                 weights_eg3d: str = None, weights_lmks: str = None):
         self.loss_lmks_lambda = loss_lmks_lambda
         self.space_regulizer = None
         self.__original_G = None
@@ -22,6 +23,8 @@ class BaseCoach:
         self.__lmkDetector = None
         self.network_pkl = network_pkl
         self.network_lmks = network_lmks
+        self.weights_eg3d = weights_eg3d
+        self.weights_lmks = weights_lmks
         self.dataset = dataset
         self.__device = device
         self.lr = lr
@@ -43,16 +46,26 @@ class BaseCoach:
 
     def restart_training(self):
         if self.network_lmks is not None:
-            with open(self.network_lmks, 'rb') as f:
-                self.__lmkDetector = pickle.Unpickler(f).load().to(self.__device).requires_grad_(True)
-        with open(self.network_pkl, 'rb') as f:
-            G = legacy.load_network_pkl(f)['G_ema'].to(self.__device)  # type: ignore
-            self.__G = Generator(**G.init_kwargs).requires_grad_(False).to(self.__device)
-            misc.copy_params_and_buffers(G, self.__G if list(G.named_parameters())[0][0].startswith("triplane.") else self.__G.triplane, require_all=False)
+            if self.network_lmks.endswith('.pt'):
+                self.__lmkDetector = torch.load(self.network_lmks)
+            else:
+                with open(self.network_lmks, 'rb') as f:
+                    self.__lmkDetector = pickle.Unpickler(f).load().to(self.__device).requires_grad_(True)
+            if self.weights_lmks is not None:
+                self.__lmkDetector.load_state_dict(torch.load(self.weights_lmks))
+        if self.network_pkl.endswith('.pt'):
+            self.__G = torch.load(self.network_pkl)
+        else:
+            with open(self.network_pkl, 'rb') as f:
+                G = legacy.load_network_pkl(f)['G_ema'].to(self.__device)  # type: ignore
+                self.__G = Generator(**G.init_kwargs).requires_grad_(False).to(self.__device)
+                misc.copy_params_and_buffers(G, self.__G if list(G.named_parameters())[0][0].startswith("triplane.") else self.__G.triplane, require_all=False)
         self.__G.rendering_kwargs['depth_resolution'] = int(self.__G.rendering_kwargs['depth_resolution'] * self.sampling_multiplier)
         self.__G.rendering_kwargs['depth_resolution_importance'] = int(self.__G.rendering_kwargs['depth_resolution_importance'] * self.sampling_multiplier)
         for p in self.__G.parameters():
             p.requires_grad = True
+        if self.weights_eg3d is not None:
+            self.__lmkDetector.load_state_dict(torch.load(self.weights_eg3d))
         self.__original_G = copy.deepcopy(self.__G)
 
     def getOriginalG(self):

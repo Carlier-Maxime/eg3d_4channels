@@ -28,6 +28,8 @@ from training.dataset import ImageAndNumpyFolderDataset
 @click.option('--lr', type=float, default=3e-4, help='learning rate')
 @click.option('--use-idr', type=bool, default=False, is_flag=True, help='use idr_torch')
 @click.option('--limit-metrics', type=click.IntRange(min=0), default=1, help='the number of thousand images usage for calcul metrics')
+@click.option('--weights-eg3d', type=str, default=None, help='file content a weights for eg3d network')
+@click.option('--weights-lmks', type=str, default=None, help='file content a weights for landmark detector')
 def run_PTI(**kwargs):
     opts = dnnlib.EasyDict(kwargs)
     print("Run Name : "+opts.run_name)
@@ -38,7 +40,9 @@ def run_PTI(**kwargs):
         "device": opts.device,
         "lr": opts.lr,
         "outdir": opts.outdir,
-        "network_lmks": opts.network_lmks
+        "network_lmks": opts.network_lmks,
+        "weights_eg3d": opts.weights_eg3d,
+        "weights_lmks": opts.weights_lmks
     }
     coach = BaseCoach(**coach_args)
     coach.train(SimpleCoachInstance, opts.gpus, opts.batch, use_idr_torch=opts.use_idr, run_name=opts.run_name, nb_epochs=opts.epochs, steps_per_batch=opts.steps_batch, limit=opts.limit, snap=opts.snap, restart_training_between_img_batch=opts.reset_between_batch)
