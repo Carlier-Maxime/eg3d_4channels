@@ -15,7 +15,7 @@ from training.landmarkDetection import LandmarkDetector, LandmarkDetectorExperie
 
 
 def createLmkDetector(opts):
-    args = [opts.nb_pts, opts.features_res, opts.channels]
+    args = [opts.nb_pts, opts.features_res, opts.channels, opts.pts_dim]
     if opts.detector_type == 'exp':
         lmkDetector = LandmarkDetectorExperience(*args)
     else:
@@ -39,6 +39,7 @@ def createLmkDetector(opts):
 @click.option('--no-tensorboard', help='disable tensorboard', type=bool, is_flag=True, default=False, show_default=True)
 @click.option('--detector-type', help='type of landmark detector used', type=click.Choice(['std', 'exp']), default='std', show_default=True)
 @click.option('--nb-pts', help='Number of points', metavar='INT', type=click.IntRange(min=1), default=105, show_default=True)
+@click.option('--pts-dim', help='Dimension of points', metavar='INT', type=click.IntRange(min=1), default=3, show_default=True)
 @click.option('--features-res', help='Features Resolution', metavar='INT', type=click.IntRange(min=1), default=256, show_default=True)
 @click.option('--channels', help='Features Channels', metavar='INT', type=click.IntRange(min=1), default=96, show_default=True)
 @click.option('--eg3d-network', help='Network EG3D for generate features from a mapped latents provided by a dataset', metavar='PKL', type=str, default=None, show_default=True)

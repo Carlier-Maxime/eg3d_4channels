@@ -12,6 +12,7 @@ class LandmarkDetector(nn.Module):
                  nb_pts,
                  img_resolution,  # Input resolution.
                  img_channels,  # Number of input color channels.
+                 pts_dim: int = 3,
                  architecture='resnet',  # Architecture: 'orig', 'skip', 'resnet'.
                  channel_base=32768,  # Overall multiplier for the number of channels.
                  channel_max=512,  # Maximum number of channels in any layer.
@@ -26,6 +27,7 @@ class LandmarkDetector(nn.Module):
         if block_kwargs is None:
             block_kwargs = {}
         self.nb_pts = nb_pts
+        self.pts_dim = pts_dim
         self.img_resolution = img_resolution
         self.img_resolution_log2 = int(np.log2(img_resolution))
         self.img_channels = img_channels
@@ -44,7 +46,7 @@ class LandmarkDetector(nn.Module):
                                        first_layer_idx=cur_layer_idx, use_fp16=use_fp16, **block_kwargs, **common_kwargs)
             setattr(self, f'b{res}', block)
             cur_layer_idx += block.num_layers
-        self.b4 = DiscriminatorEpilogue(channels_dict[4], cmap_dim=nb_pts * 3, resolution=4, use_cmap=False, **epilogue_kwargs, **common_kwargs)
+        self.b4 = DiscriminatorEpilogue(channels_dict[4], cmap_dim=nb_pts * pts_dim, resolution=4, use_cmap=False, **epilogue_kwargs, **common_kwargs)
 
     def forward(self, img, update_emas=False, **block_kwargs):
         _ = update_emas  # unused
@@ -54,7 +56,7 @@ class LandmarkDetector(nn.Module):
             x, img = block(x, img, **block_kwargs)
 
         x = self.b4(x, img, None)
-        return x.reshape(x.shape[0], self.nb_pts, 3)
+        return x.reshape(x.shape[0], self.nb_pts, self.pts_dim)
 
     def extra_repr(self):
         return f'c_dim={self.c_dim:d}, img_resolution={self.img_resolution:d}, img_channels={self.img_channels:d}'
@@ -66,9 +68,11 @@ class LandmarkDetectorExperience(nn.Module):
                  nb_pts,  # Number of points
                  img_resolution,  # Input resolution.
                  img_channels,  # Number of input color channels.
+                 pts_dim: int = 3,
                  **_
                  ):
         super().__init__()
+        self.pts_dim = pts_dim
         embed_pooling = []
         res = img_resolution
         assert (res & (res - 1)) == 0 and res != 0, "img resolution is not a 2^x. Not supported"
@@ -109,7 +113,7 @@ class LandmarkDetectorExperience(nn.Module):
             nn.Conv2d(1024, 1024, kernel_size=3, dilation=1, padding=1))
         res = min(res, 4)
 
-        pow2_pts = 1 << (int(np.log2(nb_pts * 3)) + 2)
+        pow2_pts = 1 << (int(np.log2(nb_pts * pts_dim)) + 2)
         toPow2_pts = []
         channels = 1024
         while channels < pow2_pts:
@@ -123,7 +127,7 @@ class LandmarkDetectorExperience(nn.Module):
         self.fc_layers = nn.Sequential(
             nn.Linear(channels * res * res, pow2_pts), nn.ReLU(inplace=True),
             nn.Linear(pow2_pts, pow2_pts), nn.ReLU(inplace=True),
-            nn.Linear(pow2_pts, nb_pts * 3)
+            nn.Linear(pow2_pts, nb_pts * pts_dim)
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -133,4 +137,4 @@ class LandmarkDetectorExperience(nn.Module):
         x = self.toPow2_pts(x)
         x = x.view(x.shape[0], -1)
         x = self.fc_layers(x)
-        return x.reshape(x.shape[0], x.shape[1] // 3, -1)
+        return x.reshape(x.shape[0], x.shape[1] // self.pts_dim, -1)
