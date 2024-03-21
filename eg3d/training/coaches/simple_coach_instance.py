@@ -62,11 +62,11 @@ class SimpleCoachInstance(BaseCoachInstance):
         img_grid = img_grid.permute(0, 2, 1, 3, 4).contiguous().view(gh * H, gw * W, C).permute(2, 0, 1)
         self.model.save_preview(outdir, "preview", img_grid)
 
-    def calcul_metrics(self, limit: int = 1):
+    def calcul_metrics(self, limit: int = 1, tqdm_start_pos: int = 0):
         if limit == 0: return
         count = limit*1000 // self.model.num_gpus
         if self._is_master: count += limit % self.model.num_gpus
-        bar = tqdm(total=count, desc=f"Calcul part of metrics ({self._device})", unit="img", leave=False)
+        bar = tqdm(total=count, desc=f"Calcul part of metrics (rank:{self.rank}, device:{self._device})", unit="img", leave=False, position=tqdm_start_pos+self.rank)
         i = 0
         loss = 0
         div = 0
@@ -102,7 +102,7 @@ class SimpleCoachInstance(BaseCoachInstance):
                 if restart_training_between_img_batch: self.restart_training()
                 if self.image_counter >= limit > 0:
                     self.save_snapshot(run_name, self._local_step, total_steps, final=True)
-                    self.calcul_metrics(limit_metrics)
+                    self.calcul_metrics(limit_metrics, 2)
                     return self.G, self.lmkDetector
 
                 for _ in tqdm(range(steps_per_batch), unit="step", leave=False, disable=not self._is_master):
@@ -111,7 +111,7 @@ class SimpleCoachInstance(BaseCoachInstance):
                 self.image_counter += len(imgs)
                 if self._local_step >= next_snap:
                     self.save_snapshot(run_name, self._local_step, total_steps)
-                    self.calcul_metrics(limit_metrics)
+                    self.calcul_metrics(limit_metrics, 2)
                     next_snap += snap
         self.save_snapshot(run_name, self._local_step, total_steps, final=True)
         self.calcul_metrics(limit_metrics)
