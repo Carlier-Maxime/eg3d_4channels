@@ -45,7 +45,7 @@ def run_PTI(**kwargs):
         "weights_lmks": opts.weights_lmks
     }
     coach = BaseCoach(**coach_args)
-    coach.train(SimpleCoachInstance, opts.gpus, opts.batch, use_idr_torch=opts.use_idr, run_name=opts.run_name, nb_epochs=opts.epochs, steps_per_batch=opts.steps_batch, limit=opts.limit, snap=opts.snap, restart_training_between_img_batch=opts.reset_between_batch)
+    coach.train(SimpleCoachInstance, opts.gpus, opts.batch, use_idr_torch=opts.use_idr, run_name=opts.run_name, nb_epochs=opts.epochs, steps_per_batch=opts.steps_batch, limit=opts.limit, snap=opts.snap, restart_training_between_img_batch=opts.reset_between_batch, limit_metrics=opts.limit_metrics)
     return opts.run_name
 
 
