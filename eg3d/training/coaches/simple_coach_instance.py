@@ -12,6 +12,16 @@ class SimpleCoachInstance(BaseCoachInstance):
         self.outdir = self.model.outdir
         self.image_counter = 0
         self.snap_grid_size = (16, 9)
+        size = int(self.G.img_resolution * 0.01)
+        if self._is_master:
+            self.indices_circular_mask = torch.arange(-size, size + 1, device=device).repeat(size * 2 + 1, 1)
+            circular_mask = self.indices_circular_mask.abs()
+            self.indices_circular_mask = self.indices_circular_mask.permute(1, 0) * self.G.img_resolution + self.indices_circular_mask
+            circular_mask = circular_mask.permute(1, 0).square().add(circular_mask.square()).sqrt()
+            circular_mask = torch.where(circular_mask <= size, True, False)
+            self.indices_circular_mask = self.indices_circular_mask[circular_mask].flatten()
+        else:
+            self.indices_circular_mask = None
 
     def save_snapshot(self, run_name: str, current_step: int, nb_steps: int, final: bool = False):
         if not self._is_master: return
@@ -31,7 +41,7 @@ class SimpleCoachInstance(BaseCoachInstance):
                 for img, lmk in zip(gen_imgs, gen_lmks):
                     if len(snap_imgs) >= count: break
                     snap_imgs.append(img.cpu())
-                    snap_lmks.append(lmk.cpu())
+                    snap_lmks.append(lmk)
             bar.update(len(ws_pivots))
             if len(snap_imgs) >= count: break
         bar.close()
@@ -42,7 +52,13 @@ class SimpleCoachInstance(BaseCoachInstance):
             lmks = torch.stack(snap_lmks, dim=0).view(gh, gw, -1, 2).to(torch.int)
             tmp = torch.where(((lmks >= 0) & (lmks < self.G.img_resolution)).all(dim=3))
             lmks = lmks[tmp[0], tmp[1], tmp[2]]
-            img_grid[tmp[0], tmp[1], lmks[:, 0], lmks[:, 1]] = torch.tensor([1, -1, -1], dtype=img_grid.dtype)
+            lmks = lmks[:, 0] * self.G.img_resolution + lmks[:, 1]
+            lmks = self.indices_circular_mask.repeat(lmks.shape[0], 1).permute(1, 0).add(lmks)
+            mask = (lmks >= 0) & (lmks < self.G.img_resolution**2)
+            lmks = ((tmp[0] * gw + tmp[1]) * (H*W) + lmks)[mask]
+            img_grid = img_grid.reshape(-1, img_grid.shape[-1])
+            img_grid[lmks.cpu()] = torch.tensor([1, -1, -1], dtype=img_grid.dtype)
+            img_grid = img_grid.reshape(gh, gw, H, W, C)
         img_grid = img_grid.permute(0, 2, 1, 3, 4).contiguous().view(gh * H, gw * W, C).permute(2, 0, 1)
         self.model.save_preview(outdir, "preview", img_grid)
 
