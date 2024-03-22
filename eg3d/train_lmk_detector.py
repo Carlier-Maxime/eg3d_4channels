@@ -55,6 +55,8 @@ def main(**kwargs):
             lmkDetector = createLmkDetector(opts)
             w = torch.load(opts.resume)
             lmkDetector.load_state_dict(w)
+        elif opts.resume.endswith('.pt'):
+            lmkDetector = torch.load(opts.resume)
         else:
             with open(opts.resume, 'rb') as f:
                 lmkDetector = pickle.Unpickler(f).load().to(opts.device).requires_grad_(True)
@@ -92,8 +94,11 @@ def main(**kwargs):
     scheduler = None
     eg3d_network = None
     if opts.eg3d_network is not None:
-        with open(opts.eg3d_network, 'rb') as f:
-            eg3d_network = pickle.Unpickler(f).load()['G'].to(opts.device).requires_grad_(True)
+        if opts.eg3d_network.endswith(".pt"):
+            eg3d_network = torch.load(opts.eg3d_network)
+        else:
+            with open(opts.eg3d_network, 'rb') as f:
+                eg3d_network = pickle.Unpickler(f).load()['G'].to(opts.device).requires_grad_(True)
     if opts.reduce_lr == 'exp':
         scheduler = lr_scheduler.ExponentialLR(optimizer, gamma=0.999)
 
@@ -115,8 +120,10 @@ def main(**kwargs):
     def save_snap():
         fname = f'{opts.output}/lmkDetector-{nb_imgs // 1000:06d}'
         if opts.resume is not None:
-            resume = opts.resume.split("lmkDetector-")[1].split(".pth")[0].split("-")[0]
-            fname += f'-resume-{resume}'
+            tmp = opts.resume.split("lmkDetector-")
+            if len(tmp) > 1:
+                resume = tmp[1].split(".pth")[0].split("-")[0]
+                fname += f'-resume-{resume}'
         if opts.to_pth:
             torch.save(lmkDetector.state_dict(), f'{fname}.pth')
         else:
