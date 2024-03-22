@@ -167,7 +167,7 @@ class InfiniteSampler(SimpleSampler):
     def __init__(self, dataset, rank=0, num_replicas=1, shuffle=True, seed=0, window_size=0.5):
         super().__init__(dataset, rank, num_replicas, shuffle, seed, window_size)
 
-    def has_next(self):
+    def has_next(self, idx):
         return True
 
     def __len__(self):
