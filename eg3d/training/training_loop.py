@@ -189,6 +189,13 @@ def training_loop(
     G.register_buffer('dataset_label_std', torch.tensor(training_set.get_label_std()).to(device))
     D = dnnlib.util.construct_class_by_name(**D_kwargs, **common_kwargs).train().requires_grad_(False).to(device)  # subclass of torch.nn.Module
     G_ema = copy.deepcopy(G).eval()
+    if training_set_kwargs.use_density_cube:
+        D_density_kwargs = D_kwargs.copy()
+        D_density_kwargs['class_name'] = 'training.dual_discriminator.DensityCubeDiscriminator'
+        D_density_kwargs['conv_clamp'] = 1
+        D_density = dnnlib.util.construct_class_by_name(**D_density_kwargs, c_dim=common_kwargs['c_dim'], size=training_set.cube_size).train().requires_grad_(False).to(device)
+    else:
+        D_density = None
 
     # Resume from existing pickle.
     if (resume_pkl is not None) and (rank == 0):
@@ -228,7 +235,7 @@ def training_loop(
     # Setup training phases.
     if rank == 0:
         print('Setting up training phases...')
-    loss = dnnlib.util.construct_class_by_name(device=device, G=G, D=D, augment_pipe=augment_pipe, **loss_kwargs)  # subclass of training.loss.Loss
+    loss = dnnlib.util.construct_class_by_name(device=device, G=G, D=D, D_density=D_density, augment_pipe=augment_pipe, **loss_kwargs)  # subclass of training.loss.Loss
     phases = []
     for name, module, opt_kwargs, reg_interval in [('G', G, G_opt_kwargs, G_reg_interval), ('D', D, D_opt_kwargs, D_reg_interval)]:
         if reg_interval is None:

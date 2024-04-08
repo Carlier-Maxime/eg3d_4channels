@@ -144,4 +144,26 @@ class DualDiscriminator(SingleDiscriminator):
     def get_cmap(self, c):
         return self.mapping(None, (c + torch.randn_like(c) * c.std(0) * self.disc_c_noise) if self.disc_c_noise > 0 else c) if self.c_dim > 0 else None
 
+
 # ----------------------------------------------------------------------------
+
+@persistence.persistent_class
+class DensityCubeDiscriminator(SingleDiscriminator):
+    def __init__(self,
+                 c_dim,  # Conditioning label (C) dimensionality.
+                 size,  # Size of cube
+                 architecture='resnet',  # Architecture: 'orig', 'skip', 'resnet'.
+                 channel_base=32768,  # Overall multiplier for the number of channels.
+                 channel_max=512,  # Maximum number of channels in any layer.
+                 num_fp16_res=4,  # Use FP16 for the N highest resolutions.
+                 conv_clamp=256,  # Clamp the output of convolution layers to +-X, None = disable clamping.
+                 cmap_dim=None,  # Dimensionality of mapped conditioning label, None = default.
+                 disc_c_noise=0,  # Corrupt camera parameters with X std dev of noise before disc. pose conditioning.
+                 block_kwargs=None,  # Arguments for DiscriminatorBlock.
+                 mapping_kwargs=None,  # Arguments for MappingNetwork.
+                 epilogue_kwargs=None,  # Arguments for DiscriminatorEpilogue.
+                 ):
+        super().__init__(c_dim, size, size, architecture, channel_base, channel_max, num_fp16_res, conv_clamp, cmap_dim, disc_c_noise, block_kwargs, mapping_kwargs, epilogue_kwargs)
+
+    def preprocess_img(self, img):
+        return img
