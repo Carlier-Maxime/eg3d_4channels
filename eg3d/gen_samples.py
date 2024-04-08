@@ -58,7 +58,7 @@ def make_transform(translate: Tuple[float, float], angle: float):
     return m
 
 
-def gen_density_cube(G, ws, size: int, max_batch: int = 1000000, truncation_psi: float = 1, truncation_cutoff=None, pad: int = 0, verbose: bool = True):
+def gen_density_cube(G, ws, size: int, max_batch: int = 1000000, truncation_psi: float = 1, truncation_cutoff=None, pad: int = 0, verbose: bool = True, with_grad: bool = False):
     samples, voxel_origin, voxel_size = create_samples(N=size, voxel_origin=[0, 0, 0], cube_length=G.rendering_kwargs['box_warp'] * 1)  # .reshape(1, -1, 3)
     samples = samples.repeat(ws.shape[0], 1, 1)
     samples = samples.to(ws.device)
@@ -68,7 +68,7 @@ def gen_density_cube(G, ws, size: int, max_batch: int = 1000000, truncation_psi:
 
     head = 0
     with tqdm(total=samples.shape[1], disable=not verbose) as pbar:
-        with torch.no_grad():
+        with torch.enable_grad() if with_grad else torch.no_grad():
             while head < samples.shape[1]:
                 torch.manual_seed(0)
                 sigma = G.sample_mixed(samples[:, head:head + max_batch], transformed_ray_directions_expanded[:, :samples.shape[1] - head], ws, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff, noise_mode='const')['sigma']
