@@ -75,8 +75,7 @@ class StyleGAN2Loss(Loss):
                 ws[:, cutoff:] = self.G.mapping(torch.randn_like(z), c, update_emas=False)[:, cutoff:]
         return ws
 
-    def run_G(self, z, c, swapping_prob, neural_rendering_resolution, update_emas=False):
-        ws = self.get_G_ws(z, c, swapping_prob, update_emas)
+    def run_G(self, ws, c, neural_rendering_resolution, update_emas=False):
         gen_output = self.G.synthesis(ws, c, neural_rendering_resolution=neural_rendering_resolution, update_emas=update_emas)
         return gen_output, ws
 
@@ -100,8 +99,7 @@ class StyleGAN2Loss(Loss):
     def run_D_density(self, cube, c, update_emas: bool = False):
         return self.D_density(cube, c, update_emas)
 
-    def density_reg_sigma(self, z, c, swapping_prob, perturbation_amplitude, nb_points: int = 1000):
-        ws = self.get_G_ws(z, c, swapping_prob, style_mixing=False)
+    def density_reg_sigma(self, ws, perturbation_amplitude, nb_points: int = 1000):
         initial_coordinates = torch.rand((ws.shape[0], nb_points, 3), device=ws.device) * 2 - 1  # Front
         perturbed_coordinates = initial_coordinates + torch.tensor([0, 0, -1], device=ws.device) * (1 / 256) * perturbation_amplitude  # Behind
         all_coordinates = torch.cat([initial_coordinates, perturbed_coordinates], dim=1)
@@ -110,21 +108,21 @@ class StyleGAN2Loss(Loss):
         sigma_perturbed = sigma[:, sigma.shape[1] // 2:]
         return sigma_initial, sigma_perturbed
 
-    def density_reg_l1(self, z, c, gain, swapping_prob, perturbation_amplitude):
-        sigma_initial, sigma_perturbed = self.density_reg_sigma(z, c, swapping_prob, perturbation_amplitude, nb_points=1000)
+    def density_reg_l1(self, ws, gain, perturbation_amplitude):
+        sigma_initial, sigma_perturbed = self.density_reg_sigma(ws, perturbation_amplitude, nb_points=1000)
         TVloss = torch.nn.functional.l1_loss(sigma_initial, sigma_perturbed) * self.G.rendering_kwargs['density_reg']
         TVloss.mul(gain).backward()
 
-    def density_reg_monotonic(self, z, c, gain, swapping_prob, fixed: bool = False):
-        sigma_initial, sigma_perturbed = self.density_reg_sigma(z, c, swapping_prob, self.G.rendering_kwargs['box_warp'], nb_points=2000)
+    def density_reg_monotonic(self, ws, gain, fixed: bool = False):
+        sigma_initial, sigma_perturbed = self.density_reg_sigma(ws, self.G.rendering_kwargs['box_warp'], nb_points=2000)
         monotonic_loss = torch.relu((sigma_initial if fixed else sigma_initial.detach()) - sigma_perturbed).mean() * 10
         monotonic_loss.mul(gain).backward()
-        self.density_reg_l1(z, c, gain, swapping_prob, self.G.rendering_kwargs['box_warp'])
+        self.density_reg_l1(ws, gain, self.G.rendering_kwargs['box_warp'])
 
-    def gen_logits(self, phase: str, gen_z, gen_c, gain, swapping_prob, neural_rendering_resolution, blur_sigma):
+    def gen_logits(self, phase: str, ws, gen_c, gain, neural_rendering_resolution, blur_sigma):
         assert phase in ['Gmain', 'Dgen']
         with torch.autograd.profiler.record_function(phase + '_forward'):
-            gen_img, _gen_ws = self.run_G(gen_z, gen_c, swapping_prob=swapping_prob, neural_rendering_resolution=neural_rendering_resolution, update_emas=phase == 'Dgen')
+            gen_img, _gen_ws = self.run_G(ws, gen_c, neural_rendering_resolution=neural_rendering_resolution, update_emas=phase == 'Dgen')
             gen_logits = self.run_D(gen_img, gen_c, blur_sigma=blur_sigma, update_emas=phase == 'Dgen')
             training_stats.report('Loss/scores/fake', gen_logits)
             training_stats.report('Loss/signs/fake', gen_logits.sign())
@@ -161,26 +159,27 @@ class StyleGAN2Loss(Loss):
                 real_img_raw = upfirdn2d.filter2d(real_img_raw, f / f.sum())
 
         real_img = {'image': real_img, 'image_raw': real_img_raw}
+        ws = self.get_G_ws(gen_z, gen_c, swapping_prob=swapping_prob)
 
         # Gmain: Maximize logits for generated images.
         if phase in ['Gmain', 'Gboth']:
-            self.gen_logits('Gmain', gen_z, gen_c, gain, swapping_prob, neural_rendering_resolution, blur_sigma)
+            self.gen_logits('Gmain', ws, gen_c, gain, neural_rendering_resolution, blur_sigma)
 
         # Density Regularization
         if phase in ['Greg', 'Gboth'] and self.G.rendering_kwargs.get('density_reg', 0) > 0:
             if self.G.rendering_kwargs['reg_type'] == 'l1':
-                self.density_reg_l1(gen_z, gen_c, gain, swapping_prob, self.G.rendering_kwargs['density_reg_p_dist'])
+                self.density_reg_l1(ws, gain, self.G.rendering_kwargs['density_reg_p_dist'])
             elif self.G.rendering_kwargs['reg_type'] == 'monotonic-detach':
-                self.density_reg_monotonic(gen_z, gen_c, gain, swapping_prob)
+                self.density_reg_monotonic(ws, gain)
             elif self.G.rendering_kwargs['reg_type'] == 'monotonic-fixed':
-                self.density_reg_monotonic(gen_z, gen_c, gain, swapping_prob, fixed=True)
+                self.density_reg_monotonic(ws, gain, fixed=True)
             else:
                 raise NotImplementedError
 
         # Dmain: Minimize logits for generated images.
         loss_Dgen = 0
         if phase in ['Dmain', 'Dboth']:
-            loss_Dgen = self.gen_logits('Dgen', gen_z, gen_c, gain, swapping_prob, neural_rendering_resolution, blur_sigma)
+            loss_Dgen = self.gen_logits('Dgen', ws, gen_c, gain, neural_rendering_resolution, blur_sigma)
 
         # Dmain: Maximize logits for real images.
         # Dr1: Apply R1 regularization.
@@ -222,8 +221,7 @@ class StyleGAN2Loss(Loss):
 
         if phase == 'Gdensity':
             with torch.autograd.profiler.record_function(phase + '_forward'):
-                _gen_ws = self.get_G_ws(gen_z, gen_c, swapping_prob=swapping_prob)
-                gen_cube = gen_density_cube(self.G, _gen_ws, self.D_density.img_resolution, verbose=False, with_grad=True)
+                gen_cube = gen_density_cube(self.G, ws, self.D_density.img_resolution, verbose=False, with_grad=True)
                 gen_logits = self.run_D_density(gen_cube, gen_c)
                 loss = torch.nn.functional.softplus(-gen_logits)
                 training_stats.report(f'Loss/density/fake', loss)
