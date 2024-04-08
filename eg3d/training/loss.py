@@ -238,7 +238,8 @@ class SpaceRegulizer:
 
         return result_w
 
-    def get_image_from_ws(self, w_codes, G):
+    @staticmethod
+    def get_image_from_ws(w_codes, G):
         return torch.cat([G.synthesis(w_code, noise_mode='none', force_fp32=True) for w_code in w_codes])
 
     def ball_holder_loss_lazy(self, new_G, num_of_sampled_latents, w_batch):
