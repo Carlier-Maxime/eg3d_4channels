@@ -16,6 +16,7 @@ from torch_utils import training_stats
 from torch_utils.ops import conv2d_gradfix
 from torch_utils.ops import upfirdn2d
 from training.dual_discriminator import filtered_resizing
+from gen_samples import gen_density_cube
 
 
 # ----------------------------------------------------------------------------
@@ -29,12 +30,13 @@ class Loss:
 # ----------------------------------------------------------------------------
 
 class StyleGAN2Loss(Loss):
-    def __init__(self, device, G, D, augment_pipe=None, r1_gamma=10, style_mixing_prob=0, pl_weight=0, pl_batch_shrink=2, pl_decay=0.01, pl_no_weight_grad=False, blur_init_sigma=0, blur_fade_kimg=0, r1_gamma_init=0, r1_gamma_fade_kimg=0, neural_rendering_resolution_initial=64, neural_rendering_resolution_final=None, neural_rendering_resolution_fade_kimg=0,
+    def __init__(self, device, G, D, D_density, augment_pipe=None, r1_gamma=10, style_mixing_prob=0, pl_weight=0, pl_batch_shrink=2, pl_decay=0.01, pl_no_weight_grad=False, blur_init_sigma=0, blur_fade_kimg=0, r1_gamma_init=0, r1_gamma_fade_kimg=0, neural_rendering_resolution_initial=64, neural_rendering_resolution_final=None, neural_rendering_resolution_fade_kimg=0,
                  gpc_reg_fade_kimg=1000, gpc_reg_prob=None, dual_discrimination=False, filter_mode='antialiased'):
         super().__init__()
         self.device = device
         self.G = G
         self.D = D
+        self.D_density = D_density
         self.augment_pipe = augment_pipe
         self.r1_gamma = r1_gamma
         self.style_mixing_prob = style_mixing_prob
@@ -94,6 +96,9 @@ class StyleGAN2Loss(Loss):
 
         logits = self.D(img, c, update_emas=update_emas)
         return logits
+
+    def run_D_density(self, cube, c, update_emas: bool = False):
+        return self.D_density(cube, c, update_emas)
 
     def density_reg_sigma(self, z, c, swapping_prob, perturbation_amplitude, nb_points: int = 1000):
         ws = self.get_G_ws(z, c, swapping_prob, style_mixing=False)
@@ -214,6 +219,25 @@ class StyleGAN2Loss(Loss):
 
             with torch.autograd.profiler.record_function(name + '_backward'):
                 (loss_Dreal + loss_Dr1).mean().mul(gain).backward()
+
+        if phase == 'Gdensity':
+            with torch.autograd.profiler.record_function(phase + '_forward'):
+                _gen_ws = self.get_G_ws(gen_z, gen_c, swapping_prob=swapping_prob)
+                gen_cube = gen_density_cube(self.G, _gen_ws, self.D_density.img_resolution, verbose=False, with_grad=True)
+                gen_logits = self.run_D_density(gen_cube, gen_c)
+                loss = torch.nn.functional.softplus(-gen_logits)
+                training_stats.report(f'Loss/density/fake', loss)
+            with torch.autograd.profiler.record_function(phase + '_backward'):
+                loss.mean().mul(gain).backward()
+
+        if phase == 'Ddensity':
+            with torch.autograd.profiler.record_function(phase + '_forward'):
+                cube = real_cube.detach().requires_grad_(True)
+                logits = self.run_D_density(cube, gen_c, update_emas=True)
+                loss = torch.nn.functional.softplus(logits)
+                training_stats.report(f'Loss/density/real', loss)
+            with torch.autograd.profiler.record_function(phase + '_backward'):
+                loss.mean().mul(gain).backward()
 
 
 # ----------------------------------------------------------------------------
