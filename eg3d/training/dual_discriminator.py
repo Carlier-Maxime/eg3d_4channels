@@ -71,8 +71,14 @@ class SingleDiscriminator(torch.nn.Module):
             self.mapping = MappingNetwork(z_dim=0, c_dim=c_dim, w_dim=cmap_dim, num_ws=None, w_avg_beta=None, **mapping_kwargs)
         self.b4 = DiscriminatorEpilogue(channels_dict[4], cmap_dim=cmap_dim, resolution=4, **epilogue_kwargs, **common_kwargs)
 
+    def preprocess_img(self, img):
+        return img['image']
+
+    def get_cmap(self, c):
+        return self.mapping(None, c) if self.c_dim > 0 else None
+
     def forward(self, img, c, update_emas=False, **block_kwargs):
-        img = img['image']
+        img = self.preprocess_img(img)
 
         _ = update_emas  # unused
         x = None
@@ -80,10 +86,7 @@ class SingleDiscriminator(torch.nn.Module):
             block = getattr(self, f'b{res}')
             x, img = block(x, img, **block_kwargs)
 
-        cmap = None
-        if self.c_dim > 0:
-            cmap = self.mapping(None, c)
-        x = self.b4(x, img, cmap)
+        x = self.b4(x, img, self.get_cmap(c))
         return x
 
     def extra_repr(self):
@@ -115,7 +118,7 @@ def filtered_resizing(image_orig_tensor, size, f, filter_mode='antialiased'):
 # ----------------------------------------------------------------------------
 
 @persistence.persistent_class
-class DualDiscriminator(torch.nn.Module):
+class DualDiscriminator(SingleDiscriminator):
     def __init__(self,
                  c_dim,  # Conditioning label (C) dimensionality.
                  img_resolution,  # Input resolution.
@@ -131,64 +134,14 @@ class DualDiscriminator(torch.nn.Module):
                  mapping_kwargs=None,  # Arguments for MappingNetwork.
                  epilogue_kwargs=None,  # Arguments for DiscriminatorEpilogue.
                  ):
-        super().__init__()
-        if epilogue_kwargs is None:
-            epilogue_kwargs = {}
-        if mapping_kwargs is None:
-            mapping_kwargs = {}
-        if block_kwargs is None:
-            block_kwargs = {}
-        img_channels *= 2
-
-        self.c_dim = c_dim
-        self.img_resolution = img_resolution
-        self.img_resolution_log2 = int(np.log2(img_resolution))
-        self.img_channels = img_channels
-        self.block_resolutions = [2 ** i for i in range(self.img_resolution_log2, 2, -1)]
-        channels_dict = {res: min(channel_base // res, channel_max) for res in self.block_resolutions + [4]}
-        fp16_resolution = max(2 ** (self.img_resolution_log2 + 1 - num_fp16_res), 8)
-
-        if cmap_dim is None:
-            cmap_dim = channels_dict[4]
-        if c_dim == 0:
-            cmap_dim = 0
-
-        common_kwargs = dict(img_channels=img_channels, architecture=architecture, conv_clamp=conv_clamp)
-        cur_layer_idx = 0
-        for res in self.block_resolutions:
-            in_channels = channels_dict[res] if res < img_resolution else 0
-            tmp_channels = channels_dict[res]
-            out_channels = channels_dict[res // 2]
-            use_fp16 = (res >= fp16_resolution)
-            block = DiscriminatorBlock(in_channels, tmp_channels, out_channels, resolution=res,
-                                       first_layer_idx=cur_layer_idx, use_fp16=use_fp16, **block_kwargs, **common_kwargs)
-            setattr(self, f'b{res}', block)
-            cur_layer_idx += block.num_layers
-        if c_dim > 0:
-            self.mapping = MappingNetwork(z_dim=0, c_dim=c_dim, w_dim=cmap_dim, num_ws=None, w_avg_beta=None, **mapping_kwargs)
-        self.b4 = DiscriminatorEpilogue(channels_dict[4], cmap_dim=cmap_dim, resolution=4, **epilogue_kwargs, **common_kwargs)
+        super().__init__(c_dim, img_resolution, img_channels * 2, architecture, channel_base, channel_max, num_fp16_res, conv_clamp, cmap_dim, disc_c_noise, block_kwargs, mapping_kwargs, epilogue_kwargs)
         self.register_buffer('resample_filter', upfirdn2d.setup_filter([1, 3, 3, 1]))
         self.disc_c_noise = disc_c_noise
 
-    def forward(self, img, c, update_emas=False, **block_kwargs):
-        image_raw = filtered_resizing(img['image_raw'], size=img['image'].shape[-1], f=self.resample_filter)
-        img = torch.cat([img['image'], image_raw], 1)
+    def preprocess_img(self, img):
+        return torch.cat([img['image'], filtered_resizing(img['image_raw'], size=img['image'].shape[-1], f=self.resample_filter)], 1)
 
-        _ = update_emas  # unused
-        x = None
-        for res in self.block_resolutions:
-            block = getattr(self, f'b{res}')
-            x, img = block(x, img, **block_kwargs)
-
-        cmap = None
-        if self.c_dim > 0:
-            if self.disc_c_noise > 0:
-                c += torch.randn_like(c) * c.std(0) * self.disc_c_noise
-            cmap = self.mapping(None, c)
-        x = self.b4(x, img, cmap)
-        return x
-
-    def extra_repr(self):
-        return f'c_dim={self.c_dim:d}, img_resolution={self.img_resolution:d}, img_channels={self.img_channels:d}'
+    def get_cmap(self, c):
+        return self.mapping(None, (c + torch.randn_like(c) * c.std(0) * self.disc_c_noise) if self.disc_c_noise > 0 else c) if self.c_dim > 0 else None
 
 # ----------------------------------------------------------------------------
