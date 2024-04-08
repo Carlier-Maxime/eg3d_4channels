@@ -259,6 +259,7 @@ class ImageAndCubeFolderDataset(ImageFolderDataset):
         self._cube_fnames = sorted(fname for fname in self._all_fnames if self._file_ext(fname) in ['.mrc'])
         assert len(self._cube_fnames) == len(self._image_fnames), 'missing real cube (file .mrc)'
         self.cube_shape = self._load_cube(0).shape
+        self.cube_size = self.cube_shape[0]
 
     def _load_cube(self, index):
         return mrcfile.read(os.path.join(self._path, self._cube_fnames[index]))
