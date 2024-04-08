@@ -33,7 +33,7 @@ from torch_utils.ops import grid_sample_gradfix
 
 # ----------------------------------------------------------------------------
 
-def setup_snapshot_image_grid(training_set, random_seed=0):
+def setup_snapshot_image_grid(training_set, random_seed=0, with_density_cube: bool = False):
     rnd = np.random.RandomState(random_seed)
     gw = np.clip(7680 // training_set.image_shape[2], 7, 32)
     gh = np.clip(4320 // training_set.image_shape[1], 4, 32)
@@ -68,8 +68,13 @@ def setup_snapshot_image_grid(training_set, random_seed=0):
             label_groups[label] = [indices[(i + gw) % len(indices)] for i in range(len(indices))]
 
     # Load data.
-    images, labels = zip(*[training_set[i] for i in grid_indices])
-    return (gw, gh), np.stack(images), np.stack(labels)
+    _all = zip(*[training_set[i] for i in grid_indices])
+    if with_density_cube:
+        images, labels, cubes = _all
+        return (gw, gh), np.stack(images), np.stack(labels), np.stack(cubes)
+    else:
+        images, labels = _all
+        return (gw, gh), np.stack(images), np.stack(labels)
 
 
 # ----------------------------------------------------------------------------
@@ -237,6 +242,8 @@ def training_loop(
             opt = dnnlib.util.construct_class_by_name(module.parameters(), **opt_kwargs)  # subclass of torch.optim.Optimizer
             phases += [dnnlib.EasyDict(name=name + 'main', module=module, opt=opt, interval=1)]
             phases += [dnnlib.EasyDict(name=name + 'reg', module=module, opt=opt, interval=reg_interval)]
+        if training_set_kwargs.use_density_cube:
+            phases += [dnnlib.EasyDict(name=name + 'density', module=module, opt=opt, interval=1)]
     for phase in phases:
         phase.start_event = None
         phase.end_event = None
@@ -250,7 +257,8 @@ def training_loop(
     grid_c = None
     if rank == 0:
         print('Exporting sample images...')
-        grid_size, images, labels = setup_snapshot_image_grid(training_set=training_set)
+        _all = setup_snapshot_image_grid(training_set=training_set, with_density_cube=training_set_kwargs.use_density_cube)
+        grid_size, images, labels = _all[0], _all[1], _all[2]
         save_image_grid(images, os.path.join(run_dir, 'reals.png'), drange=[0, 255], grid_size=grid_size)
         grid_z = torch.randn([labels.shape[0], G.z_dim], device=device).split(batch_gpu)
         grid_c = torch.from_numpy(labels).to(device).split(batch_gpu)
@@ -288,9 +296,13 @@ def training_loop(
 
         # Fetch training data.
         with torch.autograd.profiler.record_function('data_fetch'):
-            phase_real_img, phase_real_c = next(training_set_iterator)
+            if training_set_kwargs.use_density_cube: phase_real_img, phase_real_c, phase_real_cube = next(training_set_iterator)
+            else:
+                phase_real_img, phase_real_c = next(training_set_iterator)
+                phase_real_cube = [None for _ in range(len(phase_real_c))]
             phase_real_img = (phase_real_img.to(device).to(torch.float32) / 127.5 - 1).split(batch_gpu)
             phase_real_c = phase_real_c.to(device).split(batch_gpu)
+            phase_real_cube = phase_real_cube.to(device).split(batch_gpu)
             all_gen_z = torch.randn([len(phases) * batch_size, G.z_dim], device=device)
             all_gen_z = [phase_gen_z.split(batch_gpu) for phase_gen_z in all_gen_z.split(batch_size)]
             all_gen_c = [training_set.get_label(np.random.randint(len(training_set))) for _ in range(len(phases) * batch_size)]
@@ -307,8 +319,8 @@ def training_loop(
             # Accumulate gradients.
             phase.opt.zero_grad(set_to_none=True)
             phase.module.requires_grad_(True)
-            for real_img, real_c, gen_z, gen_c in zip(phase_real_img, phase_real_c, phase_gen_z, phase_gen_c):
-                loss.accumulate_gradients(phase=phase.name, real_img=real_img, real_c=real_c, gen_z=gen_z, gen_c=gen_c, gain=phase.interval, cur_nimg=cur_nimg)
+            for real_img, real_c, real_cube, gen_z, gen_c in zip(phase_real_img, phase_real_c, phase_real_cube, phase_gen_z, phase_gen_c):
+                loss.accumulate_gradients(phase=phase.name, real_img=real_img, real_c=real_c, real_cube=real_cube, gen_z=gen_z, gen_c=gen_c, gain=phase.interval, cur_nimg=cur_nimg)
             phase.module.requires_grad_(False)
 
             # Update weights.

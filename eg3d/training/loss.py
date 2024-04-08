@@ -22,7 +22,7 @@ from training.dual_discriminator import filtered_resizing
 
 
 class Loss:
-    def accumulate_gradients(self, phase, real_img, real_c, gen_z, gen_c, gain, cur_nimg):  # to be overridden by subclass
+    def accumulate_gradients(self, phase, real_img, real_c, gen_z, gen_c, gain, cur_nimg, **kwargs):  # to be overridden by subclass
         raise NotImplementedError()
 
 
@@ -129,8 +129,8 @@ class StyleGAN2Loss(Loss):
             loss.mean().mul(gain).backward()
         return loss
 
-    def accumulate_gradients(self, phase, real_img, real_c, gen_z, gen_c, gain, cur_nimg):
-        assert phase in ['Gmain', 'Greg', 'Gboth', 'Dmain', 'Dreg', 'Dboth']
+    def accumulate_gradients(self, phase, real_img, real_c, gen_z, gen_c, gain, cur_nimg, real_cube=None, **kwargs):
+        assert phase in ['Gmain', 'Greg', 'Gboth', 'Dmain', 'Dreg', 'Dboth', 'Gdensity', 'Ddensity']
         if self.G.rendering_kwargs.get('density_reg', 0) == 0:
             phase = {'Greg': 'none', 'Gboth': 'Gmain'}.get(phase, phase)
         if self.r1_gamma == 0:

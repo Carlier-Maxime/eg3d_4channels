@@ -17,6 +17,8 @@ import PIL.Image
 import json
 import torch
 import torch.utils.data
+import mrcfile
+
 import dnnlib
 
 try:
@@ -246,6 +248,27 @@ class ImageFolderDataset(Dataset):
         labels = np.array(labels)
         labels = labels.astype({1: np.int64, 2: np.float32}[labels.ndim])
         return labels
+
+
+# ----------------------------------------------------------------------------
+
+class ImageAndCubeFolderDataset(ImageFolderDataset):
+    def __init__(self, path: str, resolution=None, force_rgb=False, use_density_cube: bool = True, **super_kwargs):
+        super().__init__(path, resolution, force_rgb, **super_kwargs)
+        self.use_density_cube = use_density_cube
+        self._cube_fnames = sorted(fname for fname in self._all_fnames if self._file_ext(fname) in ['.mrc'])
+        assert len(self._cube_fnames) == len(self._image_fnames), 'missing real cube (file .mrc)'
+        self.cube_shape = self._load_cube(0).shape
+
+    def _load_cube(self, index):
+        return mrcfile.read(os.path.join(self._path, self._cube_fnames[index]))
+
+    def __getitem__(self, index):
+        img, c = super().__getitem__(index)
+        if not self.use_density_cube: return img, c
+        cube = self._load_cube(index)
+        assert cube.shape == self.cube_shape
+        return img, c, cube
 
 
 # ----------------------------------------------------------------------------

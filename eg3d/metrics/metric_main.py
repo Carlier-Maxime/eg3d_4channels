@@ -51,7 +51,9 @@ def calc_metric(metric, **kwargs):  # See metric_utils.MetricOptions for the ful
 
     # Calculate.
     start_time = time.time()
-    results = _metric_dict[metric](opts)
+    metric_opts = opts
+    metric_opts.dataset_kwargs.use_density_cube = False
+    results = _metric_dict[metric](metric_opts)
     total_time = time.time() - start_time
 
     # Broadcast results.

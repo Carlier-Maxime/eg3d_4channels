@@ -89,9 +89,9 @@ def launch_training(c, desc, outdir, dry_run, use_idr_torch: bool = False):
 
 # ----------------------------------------------------------------------------
 
-def init_dataset_kwargs(data, force_rgb):
+def init_dataset_kwargs(data, force_rgb, use_density_cube):
     try:
-        dataset_kwargs = dnnlib.EasyDict(class_name='training.dataset.ImageFolderDataset', path=data, use_labels=True, max_size=None, xflip=False, force_rgb=force_rgb)
+        dataset_kwargs = dnnlib.EasyDict(class_name='training.dataset.ImageAndCubeFolderDataset' if use_density_cube else 'training.dataset.ImageFolderDataset', path=data, use_labels=True, max_size=None, xflip=False, force_rgb=force_rgb, use_density_cube=use_density_cube)
         dataset_obj = dnnlib.util.construct_class_by_name(**dataset_kwargs)  # Subclass of training.dataset.Dataset.
         dataset_kwargs.resolution = dataset_obj.resolution  # Be explicit about resolution.
         dataset_kwargs.use_labels = dataset_obj.has_labels  # Be explicit about labels.
@@ -128,6 +128,7 @@ def parse_comma_separated_list(s):
 @click.option('--aug', help='Augmentation mode', type=click.Choice(['noaug', 'ada', 'fixed']), default='noaug', show_default=True)
 @click.option('--resume', help='Resume from given network pickle', metavar='[PATH|URL]', type=str)
 @click.option('--freezed', help='Freeze first layers of D', metavar='INT', type=click.IntRange(min=0), default=0, show_default=True)
+@click.option('--use-density-cube', help='add density loss', metavar='BOOL', type=bool, default=False, is_flag=True, show_default=True)
 # Misc hyperparameters.
 @click.option('--p', help='Probability for --aug=fixed', metavar='FLOAT', type=click.FloatRange(min=0, max=1), default=0.2, show_default=True)
 @click.option('--target', help='Target value for --aug=ada', metavar='FLOAT', type=click.FloatRange(min=0, max=1), default=0.6, show_default=True)
@@ -210,7 +211,7 @@ def main(**kwargs):
     c.data_loader_kwargs = dnnlib.EasyDict(pin_memory=True, prefetch_factor=2)
 
     # Training set.
-    c.training_set_kwargs, dataset_name = init_dataset_kwargs(data=opts.data, force_rgb=opts.force_rgb)
+    c.training_set_kwargs, dataset_name = init_dataset_kwargs(data=opts.data, force_rgb=opts.force_rgb, use_density_cube=opts.use_density_cube)
     if opts.cond and not c.training_set_kwargs.use_labels:
         raise click.ClickException('--cond=True requires labels specified in dataset.json')
     c.training_set_kwargs.use_labels = opts.cond
