@@ -58,6 +58,35 @@ def make_transform(translate: Tuple[float, float], angle: float):
     return m
 
 
+def gen_density_cube(G, ws, size: int, max_batch: int = 1000000, truncation_psi: float = 1, truncation_cutoff=None, pad: int = 0, verbose: bool = True):
+    samples, voxel_origin, voxel_size = create_samples(N=size, voxel_origin=[0, 0, 0], cube_length=G.rendering_kwargs['box_warp'] * 1)  # .reshape(1, -1, 3)
+    samples = samples.to(ws.device)
+    sigmas = torch.zeros((samples.shape[0], samples.shape[1], 1), device=ws.device)
+    transformed_ray_directions_expanded = torch.zeros((samples.shape[0], max_batch, 3), device=ws.device)
+    transformed_ray_directions_expanded[..., -1] = -1
+
+    head = 0
+    with tqdm(total=samples.shape[1], disable=not verbose) as pbar:
+        with torch.no_grad():
+            while head < samples.shape[1]:
+                torch.manual_seed(0)
+                sigma = G.sample_mixed(samples[:, head:head + max_batch], transformed_ray_directions_expanded[:, :samples.shape[1] - head], ws, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff, noise_mode='const')['sigma']
+                sigmas[:, head:head + max_batch] = sigma
+                head += max_batch
+                pbar.update(max_batch)
+
+    sigmas = sigmas.view((size, size, size)).flip(0)
+    if pad != 0:
+        pad_value = sigmas.min().abs().mul(-1.01)
+        sigmas[:pad] = pad_value
+        sigmas[-pad:] = pad_value
+        sigmas[:, :pad] = pad_value
+        sigmas[:, -pad:] = pad_value
+        sigmas[:, :, :pad] = pad_value
+        sigmas[:, :, -pad:] = pad_value
+    return sigmas
+
+
 # ----------------------------------------------------------------------------
 
 @click.command()
@@ -160,38 +189,7 @@ def generate_images(
         PIL.Image.fromarray(img[0].cpu().numpy(), 'RGBA' if img.shape[-1] == 4 else 'RGB').save(f'{outdir}/seed{seed:04d}.png')
 
         if shapes:
-            # extract a shape.mrc with marching cubes. You can view the .mrc file using ChimeraX from UCSF.
-            max_batch = 1000000
-
-            samples, voxel_origin, voxel_size = create_samples(N=shape_res, voxel_origin=[0, 0, 0], cube_length=G.rendering_kwargs['box_warp'] * 1)  # .reshape(1, -1, 3)
-            samples = samples.to(z.device)
-            sigmas = torch.zeros((samples.shape[0], samples.shape[1], 1), device=z.device)
-            transformed_ray_directions_expanded = torch.zeros((samples.shape[0], max_batch, 3), device=z.device)
-            transformed_ray_directions_expanded[..., -1] = -1
-
-            head = 0
-            with tqdm(total=samples.shape[1]) as pbar:
-                with torch.no_grad():
-                    while head < samples.shape[1]:
-                        torch.manual_seed(0)
-                        sigma = G.sample_mixed(samples[:, head:head + max_batch], transformed_ray_directions_expanded[:, :samples.shape[1] - head], ws, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff, noise_mode='const')['sigma']
-                        sigmas[:, head:head + max_batch] = sigma
-                        head += max_batch
-                        pbar.update(max_batch)
-
-            sigmas = sigmas.reshape((shape_res, shape_res, shape_res)).cpu().numpy()
-            sigmas = np.flip(sigmas, 0)
-
-            # Trim the border of the extracted cube
-            pad = int(30 * shape_res / 256)
-            pad_value = -1000
-            sigmas[:pad] = pad_value
-            sigmas[-pad:] = pad_value
-            sigmas[:, :pad] = pad_value
-            sigmas[:, -pad:] = pad_value
-            sigmas[:, :, :pad] = pad_value
-            sigmas[:, :, -pad:] = pad_value
-
+            sigmas = gen_density_cube(G, ws, shape_res, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff, pad=int(30 * shape_res / 256)).cpu().numpy()
             if shape_format == '.ply':
                 from shape_utils import convert_sdf_samples_to_ply
                 convert_sdf_samples_to_ply(np.transpose(sigmas, (2, 1, 0)), [0, 0, 0], 1, os.path.join(outdir, f'seed{seed:04d}.ply'), level=10)
