@@ -24,7 +24,6 @@ from camera_utils import LookAtPoseSampler, FOV_to_intrinsics
 from gen_utils import parse_range, loadNetwork, create_samples
 from torch_utils import misc
 from training.generator import Generator
-from training.triplane import TriPlaneGenerator
 
 
 # ----------------------------------------------------------------------------
@@ -58,20 +57,22 @@ def make_transform(translate: Tuple[float, float], angle: float):
     return m
 
 
-def gen_density_cube(G, ws, size: int, max_batch: int = 1000000, truncation_psi: float = 1, truncation_cutoff=None, pad: int = 0, verbose: bool = True, with_grad: bool = False):
+def gen_density_cube(G, ws, size: int, max_batch: int = 1000000, pad: int = 0, verbose: bool = True, with_grad: bool = False):
     samples, voxel_origin, voxel_size = create_samples(N=size, voxel_origin=[0, 0, 0], cube_length=G.rendering_kwargs['box_warp'] * 1)  # .reshape(1, -1, 3)
     samples = samples.repeat(ws.shape[0], 1, 1)
     samples = samples.to(ws.device)
     sigmas = torch.zeros((samples.shape[0], samples.shape[1], 1), device=ws.device)
     transformed_ray_directions_expanded = torch.zeros((samples.shape[0], max_batch, 3), device=ws.device)
     transformed_ray_directions_expanded[..., -1] = -1
+    planes = G.backbone.synthesis(ws, noise_mode='const')
+    planes = planes.view(len(planes), 3, 32, planes.shape[-2], planes.shape[-1])
 
     head = 0
     with tqdm(total=samples.shape[1], disable=not verbose) as pbar:
         with torch.enable_grad() if with_grad else torch.no_grad():
             while head < samples.shape[1]:
                 torch.manual_seed(0)
-                sigma = G.sample_mixed(samples[:, head:head + max_batch], transformed_ray_directions_expanded[:, :samples.shape[1] - head], ws, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff, noise_mode='const')['sigma']
+                sigma = G.sample_planes(planes, samples[:, head:head + max_batch], transformed_ray_directions_expanded[:, :samples.shape[1] - head])['sigma']
                 sigmas[:, head:head + max_batch] = sigma
                 head += max_batch
                 pbar.update(max_batch)
@@ -139,7 +140,7 @@ def generate_images(
         print("Reloading Modules!")
         G_data = G
         G = Generator(**G_data.init_kwargs).requires_grad_(False).to(device)
-        misc.copy_params_and_buffers(G_data, G if list(G_data.named_parameters())[0][0].startswith("triplane.") else G.triplane, require_all=True)
+        misc.copy_params_and_buffers(G_data, G if list(G_data.named_parameters())[0][0].startswith("triplane.") else G.triplane, require_all=False)
         G.neural_rendering_resolution = G_data.neural_rendering_resolution
         G.rendering_kwargs = G_data.rendering_kwargs
 
@@ -190,7 +191,7 @@ def generate_images(
         PIL.Image.fromarray(img[0].cpu().numpy(), 'RGBA' if img.shape[-1] == 4 else 'RGB').save(f'{outdir}/seed{seed:04d}.png')
 
         if shapes:
-            sigmas = gen_density_cube(G, ws, shape_res, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff, pad=int(30 * shape_res / 256))[0].cpu().numpy()
+            sigmas = gen_density_cube(G, ws, shape_res, pad=int(30 * shape_res / 256))[0].cpu().numpy()
             if shape_format == '.ply':
                 from shape_utils import convert_sdf_samples_to_ply
                 convert_sdf_samples_to_ply(np.transpose(sigmas, (2, 1, 0)), [0, 0, 0], 1, os.path.join(outdir, f'seed{seed:04d}.ply'), level=10)

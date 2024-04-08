@@ -101,12 +101,15 @@ class TriPlaneGenerator(torch.nn.Module):
     def sample(self, coordinates, directions, z, c, truncation_psi=1, truncation_cutoff=None, update_emas=False, **synthesis_kwargs):
         # Compute RGB features, density for arbitrary 3D coordinates. Mostly used for extracting shapes. 
         ws = self.mapping(z, c, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff, update_emas=update_emas)
-        return self.sample_mixed(coordinates, directions, ws, truncation_psi, truncation_cutoff, update_emas, **synthesis_kwargs)
+        return self.sample_mixed(coordinates, directions, ws, update_emas, **synthesis_kwargs)
 
-    def sample_mixed(self, coordinates, directions, ws, truncation_psi=1, truncation_cutoff=None, update_emas=False, **synthesis_kwargs):
+    def sample_mixed(self, coordinates, directions, ws, update_emas=False, **synthesis_kwargs):
         # Same as sample, but expects latent vectors 'ws' instead of Gaussian noise 'z'
         planes = self.backbone.synthesis(ws, update_emas=update_emas, **synthesis_kwargs)
         planes = planes.view(len(planes), 3, 32, planes.shape[-2], planes.shape[-1])
+        return self.sample_planes(planes, coordinates, directions)
+
+    def sample_planes(self, planes, coordinates, directions):
         return self.renderer.run_model(planes, self.decoder, coordinates, directions, self.rendering_kwargs)
 
     def forward(self, z, c, truncation_psi=1, truncation_cutoff=None, neural_rendering_resolution=None, update_emas=False, cache_backbone=False, use_cached_backbone=False, **synthesis_kwargs):
