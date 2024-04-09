@@ -57,7 +57,7 @@ def make_transform(translate: Tuple[float, float], angle: float):
     return m
 
 
-def gen_density_cube(G, ws, size: int, max_batch: int = 1000000, pad: int = 0, verbose: bool = True, with_grad: bool = False):
+def gen_density_cube(G, ws, size: int, max_batch: int = 1000000, pad_perc: float = 0, verbose: bool = True, with_grad: bool = False):
     samples, voxel_origin, voxel_size = create_samples(N=size, voxel_origin=[0, 0, 0], cube_length=G.rendering_kwargs['box_warp'] * 1)  # .reshape(1, -1, 3)
     samples = samples.repeat(ws.shape[0], 1, 1)
     samples = samples.to(ws.device)
@@ -78,6 +78,7 @@ def gen_density_cube(G, ws, size: int, max_batch: int = 1000000, pad: int = 0, v
                 pbar.update(max_batch)
 
     sigmas = sigmas.view((ws.shape[0], size, size, size)).flip(0)
+    pad = (size * pad_perc) // 2
     if pad != 0:
         pad_value = sigmas.min().abs().mul(-1.01)
         sigmas[:, pad] = pad_value
@@ -106,6 +107,7 @@ def gen_density_cube(G, ws, size: int, max_batch: int = 1000000, pad: int = 0, v
 @click.option('--random-camera', help='Use a random camera', type=bool, required=False, metavar='BOOL', default=False, show_default=True, is_flag=True)
 @click.option('--single-camera', help='single camera', type=bool, required=False, metavar='BOOL', default=False, show_default=True, is_flag=True)
 @click.option('--mapped-latents', help='Save mapped latents', type=bool, required=False, metavar='BOOL', default=False, show_default=True, is_flag=True)
+@click.option('--pad-perc', help='percentage of padding for shape, 0: no pad, 1: full pad', type=click.FloatRange(min=0, max=1), required=False, metavar='float', default=0.234375, show_default=True)
 def generate_images(
         network_pkl: str,
         seeds: List[int],
@@ -120,7 +122,8 @@ def generate_images(
         reload_modules: bool,
         random_camera: bool,
         single_camera: bool,
-        mapped_latents: bool
+        mapped_latents: bool,
+        pad_perc: float
 ):
     """Generate images using pretrained network pickle.
 
@@ -191,7 +194,7 @@ def generate_images(
         PIL.Image.fromarray(img[0].cpu().numpy(), 'RGBA' if img.shape[-1] == 4 else 'RGB').save(f'{outdir}/seed{seed:04d}.png')
 
         if shapes:
-            sigmas = gen_density_cube(G, ws, shape_res, pad=int(30 * shape_res / 256))[0].cpu().numpy()
+            sigmas = gen_density_cube(G, ws, shape_res, pad_perc=pad_perc)[0].cpu().numpy()
             if shape_format == '.ply':
                 from shape_utils import convert_sdf_samples_to_ply
                 convert_sdf_samples_to_ply(np.transpose(sigmas, (2, 1, 0)), [0, 0, 0], 1, os.path.join(outdir, f'seed{seed:04d}.ply'), level=10)
