@@ -31,7 +31,7 @@ from torch_utils import custom_ops
 def subprocess_fn(rank, args, temp_dir, local_rank=-1):
     c = args
 
-    init_distributed(rank, temp_dir, c)
+    init_distributed(rank, temp_dir, c, local_rank=local_rank)
     if rank != 0:
         custom_ops.verbosity = 'none'
 
