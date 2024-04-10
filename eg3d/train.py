@@ -30,9 +30,9 @@ from torch_utils import custom_ops
 
 def subprocess_fn(rank, args, temp_dir, local_rank=-1):
     c = args
-    dnnlib.util.Logger(file_name=os.path.join(c.run_dir, 'log.txt'), file_mode='a', should_flush=True)
 
     init_distributed(rank, temp_dir, c)
+    dnnlib.util.Logger(file_name=os.path.join(c.run_dir, 'log.txt'), file_mode='a', should_flush=True)
     if rank != 0:
         custom_ops.verbosity = 'none'
 
@@ -43,7 +43,13 @@ def subprocess_fn(rank, args, temp_dir, local_rank=-1):
 # ----------------------------------------------------------------------------
 
 def launch_training(c, desc, outdir, dry_run, use_idr_torch: bool = False):
-    dnnlib.util.Logger(should_flush=True)
+    master = True
+    if use_idr_torch:
+        import idr_torch
+        master = idr_torch.rank == 0
+
+    if master:
+        dnnlib.util.Logger(should_flush=True)
 
     # Pick output directory.
     prev_run_dirs = []
@@ -54,11 +60,6 @@ def launch_training(c, desc, outdir, dry_run, use_idr_torch: bool = False):
     cur_run_id = max(prev_run_ids, default=-1) + 1
     c.run_dir = os.path.join(outdir, f'{cur_run_id:05d}-{desc}')
     assert not os.path.exists(c.run_dir)
-
-    master = True
-    if use_idr_torch:
-        import idr_torch
-        master = idr_torch.rank == 0
 
     # Print options.
     if master:

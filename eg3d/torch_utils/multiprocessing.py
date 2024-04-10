@@ -33,3 +33,4 @@ def init_distributed(rank: int, temp_dir, args):
     # Init torch_utils.
     sync_device = torch.device('cuda', rank) if args.num_gpus > 1 else None
     training_stats.init_multiprocessing(rank=rank, sync_device=sync_device)
+    torch.distributed.barrier()
