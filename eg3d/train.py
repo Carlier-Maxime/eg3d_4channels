@@ -55,35 +55,42 @@ def launch_training(c, desc, outdir, dry_run, use_idr_torch: bool = False):
     c.run_dir = os.path.join(outdir, f'{cur_run_id:05d}-{desc}')
     assert not os.path.exists(c.run_dir)
 
+    master = True
+    if use_idr_torch:
+        import idr_torch
+        master = idr_torch.rank == 0
+
     # Print options.
-    print()
-    print('Training options:')
-    print(json.dumps(c, indent=2))
-    print()
-    print(f'Output directory:    {c.run_dir}')
-    print(f'Number of GPUs:      {c.num_gpus}')
-    print(f'Batch size:          {c.batch_size} images')
-    print(f'Training duration:   {c.total_kimg} kimg')
-    print(f'Dataset path:        {c.training_set_kwargs.path}')
-    print(f'Dataset size:        {c.training_set_kwargs.max_size} images')
-    print(f'Dataset resolution:  {c.training_set_kwargs.resolution}')
-    print(f'Dataset labels:      {c.training_set_kwargs.use_labels}')
-    print(f'Dataset x-flips:     {c.training_set_kwargs.xflip}')
-    print()
+    if master:
+        print()
+        print('Training options:')
+        print(json.dumps(c, indent=2))
+        print()
+        print(f'Output directory:    {c.run_dir}')
+        print(f'Number of GPUs:      {c.num_gpus}')
+        print(f'Batch size:          {c.batch_size} images')
+        print(f'Training duration:   {c.total_kimg} kimg')
+        print(f'Dataset path:        {c.training_set_kwargs.path}')
+        print(f'Dataset size:        {c.training_set_kwargs.max_size} images')
+        print(f'Dataset resolution:  {c.training_set_kwargs.resolution}')
+        print(f'Dataset labels:      {c.training_set_kwargs.use_labels}')
+        print(f'Dataset x-flips:     {c.training_set_kwargs.xflip}')
+        print()
 
     # Dry run?
     if dry_run:
-        print('Dry run; exiting.')
+        if master: print('Dry run; exiting.')
         return
 
     # Create output directory.
-    print('Creating output directory...')
-    os.makedirs(c.run_dir)
-    with open(os.path.join(c.run_dir, 'training_options.json'), 'wt') as f:
-        json.dump(c, f, indent=2)
+    if master:
+        print('Creating output directory...')
+        os.makedirs(c.run_dir)
+        with open(os.path.join(c.run_dir, 'training_options.json'), 'wt') as f:
+            json.dump(c, f, indent=2)
 
     # Launch processes.
-    print('Launching processes...')
+    if master: print('Launching processes...')
     launch_multiprocessing(subprocess_fn, c, use_idr_torch)
 
 
