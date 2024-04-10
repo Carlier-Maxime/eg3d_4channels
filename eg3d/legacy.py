@@ -304,6 +304,24 @@ def convert_tf_discriminator(tf_D):
 
 # ----------------------------------------------------------------------------
 
+def convert_jsonl_to_tf_events(jsonl_file, tf_events_dir):
+    import json
+    from torch.utils.tensorboard import SummaryWriter
+    writer = SummaryWriter(tf_events_dir)
+    with open(jsonl_file, 'r') as f:
+        i = 0
+        for line in f:
+            data = json.loads(line)
+            timestamp = data['timestamp']
+            for name, value in data.items():
+                if name == 'timestamp': continue
+                writer.add_scalar(name, value['mean'], global_step=i, walltime=timestamp)
+            i += 1
+    writer.close()
+
+
+# ----------------------------------------------------------------------------
+
 @click.command()
 @click.option('--source', help='Input pickle', required=True, metavar='PATH')
 @click.option('--dest', help='Output pickle', required=True, metavar='PATH')
