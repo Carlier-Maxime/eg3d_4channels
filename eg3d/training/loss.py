@@ -229,10 +229,16 @@ class StyleGAN2Loss(Loss):
                 loss.mean().mul(gain).backward()
 
         if phase == 'Ddensity':
+            ws = ws.detach().requires_grad_(True)
+            gen_c = gen_c.detach().requires_grad_(True)
             with torch.autograd.profiler.record_function(phase + '_forward'):
+                gen_cube = gen_density_cube(self.G, ws, self.D_density.img_resolution, verbose=False, with_grad=True)
+                gen_logits = self.run_D_density(gen_cube, gen_c, update_emas=True)
+                lossFake = torch.nn.functional.softplus(gen_logits)
                 cube = real_cube.detach().requires_grad_(True)
-                logits = self.run_D_density(cube, gen_c, update_emas=True)
-                loss = torch.nn.functional.softplus(logits)
+                real_logits = self.run_D_density(cube, real_c)
+                lossReal = torch.nn.functional.softplus(-real_logits)
+                loss = lossFake + lossReal
                 training_stats.report(f'Loss/density/real', loss)
             with torch.autograd.profiler.record_function(phase + '_backward'):
                 loss.mean().mul(gain).backward()
