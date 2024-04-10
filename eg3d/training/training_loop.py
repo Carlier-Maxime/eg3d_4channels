@@ -287,6 +287,27 @@ def training_loop(
         if tensorboard:
             stats_tfevents = tensorboard.SummaryWriter(run_dir)
 
+    properties = torch.cuda.get_device_properties(device)
+    desc = {
+        'Name': str(properties.name),
+        'Device': str(device),
+        'Total Memory': str(properties.total_memory//1024**2)+'MB',
+        'GPUs Visible': str(torch.cuda.device_count()),
+        'GPUs Used': str(num_gpus),
+        'Rank': str(rank)
+    }
+    len_desc = torch.tensor([max(len(key), len(value)) for key, value in desc.items()], device=device)
+    torch.distributed.all_reduce(len_desc, torch.distributed.ReduceOp.MAX)
+    if rank == 0:
+        keys = list(desc.keys())
+        print()
+        for i in range(len(keys)): print(f'{keys[i]:{len_desc[i]}} | ', end='')
+        print()
+    torch.distributed.barrier()
+    values = list(desc.values())
+    print(''.join([f'{values[i]:{len_desc[i]}} | ' for i in range(len(values))]))
+    torch.distributed.barrier()
+
     # Train.
     if rank == 0:
         print(f'Training for {total_kimg} kimg...')
