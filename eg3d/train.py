@@ -32,11 +32,16 @@ def subprocess_fn(rank, args, temp_dir, local_rank=-1):
     c = args
 
     init_distributed(rank, temp_dir, c)
-    dnnlib.util.Logger(file_name=os.path.join(c.run_dir, 'log.txt'), file_mode='a', should_flush=True)
     if rank != 0:
         custom_ops.verbosity = 'none'
 
-    # Execute training loop.
+    if rank == 0:
+        print('Creating output directory...')
+        os.makedirs(c.run_dir)
+        with open(os.path.join(c.run_dir, 'training_options.json'), 'wt') as f:
+            json.dump(c, f, indent=2)
+        dnnlib.util.Logger(file_name=os.path.join(c.run_dir, 'log.txt'), file_mode='a', should_flush=True)
+
     training_loop.training_loop(rank=rank, local_rank=local_rank, **c)
 
 
@@ -82,13 +87,6 @@ def launch_training(c, desc, outdir, dry_run, use_idr_torch: bool = False):
     if dry_run:
         if master: print('Dry run; exiting.')
         return
-
-    # Create output directory.
-    if master:
-        print('Creating output directory...')
-        os.makedirs(c.run_dir)
-        with open(os.path.join(c.run_dir, 'training_options.json'), 'wt') as f:
-            json.dump(c, f, indent=2)
 
     # Launch processes.
     if master: print('Launching processes...')
