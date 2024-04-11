@@ -327,7 +327,7 @@ def training_loop(
             if training_set_kwargs.use_density_cube: phase_real_img, phase_real_c, phase_real_cube = next(training_set_iterator)
             else:
                 phase_real_img, phase_real_c = next(training_set_iterator)
-                phase_real_cube = [None for _ in range(len(phase_real_c))]
+                phase_real_cube = torch.empty((len(phase_real_c)))
             phase_real_img = (phase_real_img.to(device).to(torch.float32) / 127.5 - 1).split(batch_gpu)
             phase_real_c = phase_real_c.to(device).split(batch_gpu)
             phase_real_cube = phase_real_cube.to(device).split(batch_gpu)
