@@ -21,15 +21,14 @@ def launch_multiprocessing(subprocess_fn, args, use_idr_torch: bool = False):
 
 
 def init_distributed(rank: int, temp_dir, args, local_rank: int = -1):
-    if args.num_gpus > 1:
-        init_file = os.path.abspath(os.path.join(temp_dir, '.torch_distributed_init')) if temp_dir is not None else None
-        if os.name == 'nt':
-            init_method = ('file:///' + init_file.replace('\\', '/')) if init_file is not None else 'env:///'
-            torch.distributed.init_process_group(backend='gloo', init_method=init_method, rank=rank, world_size=args.num_gpus)
-        else:
-            init_method = f'file://{init_file}' if init_file is not None else 'env://'
-            torch.distributed.init_process_group(backend='nccl', init_method=init_method, rank=rank, world_size=args.num_gpus)
-        torch.distributed.barrier()
+    init_file = os.path.abspath(os.path.join(temp_dir, '.torch_distributed_init')) if temp_dir is not None else None
+    if os.name == 'nt':
+        init_method = ('file:///' + init_file.replace('\\', '/')) if init_file is not None else 'env:///'
+        torch.distributed.init_process_group(backend='gloo', init_method=init_method, rank=rank, world_size=args.num_gpus)
+    else:
+        init_method = f'file://{init_file}' if init_file is not None else 'env://'
+        torch.distributed.init_process_group(backend='nccl', init_method=init_method, rank=rank, world_size=args.num_gpus)
+    torch.distributed.barrier()
 
     # Init torch_utils.
     if local_rank == -1: local_rank = rank
