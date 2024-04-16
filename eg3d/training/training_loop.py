@@ -379,8 +379,6 @@ def training_loop(
                 p_ema.copy_(p.lerp(p_ema, ema_beta))
             for b_ema, b in zip(G_ema.buffers(), G.buffers()):
                 b_ema.copy_(b)
-            G_ema.neural_rendering_resolution = G.neural_rendering_resolution
-            G_ema.rendering_kwargs = G.rendering_kwargs.copy()
 
         # Update state.
         cur_nimg += batch_size
@@ -425,7 +423,7 @@ def training_loop(
 
         # Save image snapshot.
         if (rank == 0) and (image_snapshot_ticks is not None) and (done or cur_tick % image_snapshot_ticks == 0):
-            out = [G_ema(z=z, c=c, noise_mode='const') for z, c in zip(grid_z, grid_c)]
+            out = [G_ema(z=z, c=c, noise_mode='const', neural_rendering_resolution=G.neural_rendering_resolution) for z, c in zip(grid_z, grid_c)]
             images = torch.cat([o['image'].cpu() for o in out]).numpy()
             images_raw = torch.cat([o['image_raw'].cpu() for o in out]).numpy()
             images_depth = -torch.cat([o['image_depth'].cpu() for o in out]).numpy()
