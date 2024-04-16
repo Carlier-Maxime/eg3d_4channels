@@ -38,12 +38,12 @@ from viz import render_depth_sample_widget
 # ----------------------------------------------------------------------------
 
 class Visualizer(imgui_window.ImguiWindow):
-    def __init__(self, capture_dir=None):
+    def __init__(self, capture_dir=None, device='cuda'):
         super().__init__(title='Cat Machine', window_width=3840, window_height=2160)
 
         # Internals.
         self._last_error_print = None
-        self._async_renderer = AsyncRenderer()
+        self._async_renderer = AsyncRenderer(device)
         self._defer_rendering = 0
         self._tex_img = None
         self._tex_obj = None
@@ -195,7 +195,7 @@ class Visualizer(imgui_window.ImguiWindow):
 # ----------------------------------------------------------------------------
 
 class AsyncRenderer:
-    def __init__(self):
+    def __init__(self, device='cuda'):
         self._closed = False
         self._is_async = False
         self._cur_args = None
@@ -205,6 +205,7 @@ class AsyncRenderer:
         self._args_queue = None
         self._result_queue = None
         self._process = None
+        self._device = device
 
     def close(self):
         self._closed = True
@@ -245,7 +246,7 @@ class AsyncRenderer:
 
     def _set_args_sync(self, **args):
         if self._renderer_obj is None:
-            self._renderer_obj = renderer.Renderer()
+            self._renderer_obj = renderer.Renderer(self._device)
         self._cur_result = self._renderer_obj.render(**args)
 
     def get_result(self):
@@ -264,8 +265,8 @@ class AsyncRenderer:
         self._cur_stamp += 1
 
     @staticmethod
-    def _process_fn(args_queue, result_queue):
-        renderer_obj = renderer.Renderer()
+    def _process_fn(args_queue, result_queue, device='cuda'):
+        renderer_obj = renderer.Renderer(device)
         cur_args = None
         cur_stamp = None
         while True:
@@ -287,16 +288,18 @@ class AsyncRenderer:
 @click.argument('pkls', metavar='PATH', nargs=-1)
 @click.option('--capture-dir', help='Where to save screenshot captures', metavar='PATH', default=None)
 @click.option('--browse-dir', help='Specify model path for the \'Browse...\' button', metavar='PATH')
+@click.option('--device', help='Specify a device used for renderer', type=str, default='cuda')
 def main(
         pkls,
         capture_dir,
-        browse_dir
+        browse_dir,
+        device
 ):
     """Interactive model visualizer.
 
     Optional PATH argument can be used specify which .pkl file to load.
     """
-    viz = Visualizer(capture_dir=capture_dir)
+    viz = Visualizer(capture_dir=capture_dir, device=device)
 
     if browse_dir is not None:
         viz.pickle_widget.search_dirs = [browse_dir]
