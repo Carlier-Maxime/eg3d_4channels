@@ -320,8 +320,7 @@ def open_dest(dest: str) -> Tuple[str, Callable[[str, Union[bytes, str]], None],
         # necessary as folder_write_bytes() also mkdirs, but it's better
         # to give an error message earlier in case the dest folder
         # somehow cannot be created.
-        if os.path.isdir(dest) and len(os.listdir(dest)) != 0:
-            error('--dest folder must be empty')
+        # if os.path.isdir(dest) and len(os.listdir(dest)) != 0: error('--dest folder must be empty')
         os.makedirs(dest, exist_ok=True)
 
         def folder_write_bytes(fname: str, data: Union[bytes, str]):
@@ -446,7 +445,7 @@ def convert_dataset(
     labels = []
     for idx, image in tqdm(enumerate(input_iter), total=num_files):
         idx_str = f'{idx:08d}'
-        archive_fname = f'{idx_str[:5]}/img{idx_str}.png'
+        archive_fname = f'{idx_str[:5]}/{idx_str}.png'
 
         # Apply crop and resize.
         img = transform_image(image['img'])
@@ -479,7 +478,7 @@ def convert_dataset(
 
         # Save the image as an uncompressed PNG.
         img = PIL.Image.fromarray(img, {1: 'L', 3: 'RGB', 4: 'RGBA'}[channels])
-        if channels == 4: img = img.convert('RGB')
+        # if channels == 4: img = img.convert('RGB')
         image_bits = io.BytesIO()
         img.save(image_bits, format='png', compress_level=0, optimize=False)
         save_bytes(os.path.join(archive_root_dir, archive_fname), image_bits.getbuffer())
